@@ -12,6 +12,7 @@ app.secret_key = os.urandom(24)
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "settings.json")
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
 LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config_apply.log")
+POWER_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "minute_power.json")
 
 SETTINGS = [
     {
@@ -115,6 +116,26 @@ def save_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+def get_latest_power():
+    try:
+        if not os.path.exists(POWER_FILE):
+            return None, None, None
+        with open(POWER_FILE, "r") as f:
+            data = json.load(f)
+        latest_date = None
+        latest_time = None
+        latest_data = None
+        for date_key in sorted(data.keys(), reverse=True):
+            day_data = data[date_key]
+            if day_data:
+                latest_date = date_key
+                latest_time = list(day_data.keys())[-1]
+                latest_data = day_data[latest_time]
+                break
+        return latest_date, latest_time, latest_data
+    except Exception:
+        return None, None, None
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -143,7 +164,8 @@ def index():
 
     settings = load_settings()
     config = load_config()
-    return render_template("index.html", settings=settings, fields=SETTINGS, config=config)
+    power_date, power_time, power_data = get_latest_power()
+    return render_template("index.html", settings=settings, fields=SETTINGS, config=config, power_date=power_date, power_time=power_time, power_data=power_data)
 
 @app.route("/api/config", methods=["POST"])
 def update_config():
