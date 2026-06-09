@@ -24,7 +24,7 @@ class MinutePoller:
         minute_store.write(data)
         return data
 
-    def __store_power_data(self, date_str, time_str, status, solar, grid, inverter, home):
+    def __store_power_data(self, date_str, time_str, status, solar, grid, inverter, home, battery):
         power_store = JsonStore(Filenames.MINUTE_POWER_FILE.value)
         data = power_store.read()
 
@@ -36,7 +36,8 @@ class MinutePoller:
             "solar": solar,
             "grid": grid,
             "inverter": inverter,
-            "home": home
+            "home": home,
+            "battery": battery
         }
         power_store.write(data)
         return data
@@ -50,6 +51,7 @@ class MinutePoller:
         self.__save_power_data(givenergy)
 
     def __save_power_data(self, givenergy):
+        battery = givenergy.battery_level()
         raw = givenergy.system_data_latest()["data"]
 
         # Split timestamp
@@ -64,7 +66,7 @@ class MinutePoller:
         inverter = raw["inverter"]["power"]
         home = raw["consumption"]
 
-        self.__store_power_data(date_str, time_str, status, solar, grid, inverter, home)
+        self.__store_power_data(date_str, time_str, status, solar, grid, inverter, home, battery)
 
     def __save_meter_data_latest(self, givenergy) :
         date_str, time_str, solar, usage = givenergy.get_meter_data_latest()
