@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: solarcontrolar
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    command: ["cron", "-f"]
+    restart: unless-stopped
+    
+

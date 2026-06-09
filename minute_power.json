@@ -1,0 +1,25 @@
+{
+    "2026-06-09": {
+        "11:07:28": {
+            "status": "Normal",
+            "solar": 621,
+            "grid": -2,
+            "inverter": 435,
+            "home": 437
+        },
+        "11:09:31": {
+            "status": "Normal",
+            "solar": 628,
+            "grid": 5,
+            "inverter": 434,
+            "home": 428
+        },
+        "11:30:01": {
+            "status": "Normal",
+            "solar": 2025,
+            "grid": 60,
+            "inverter": 1860,
+            "home": 1799
+        }
+    }
+}

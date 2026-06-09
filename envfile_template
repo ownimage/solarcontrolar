@@ -1,0 +1,5 @@
+export SOLCAST_API_KEY="solcast_api_key"
+export SOLCAST_SITE_ID="solcast_site_id"
+export GIVENERGY_API_KEY="givenergy_api_key"
+export GIVENERGY_INVERTER_ID="givenergy_inverter_id"
+export GIVENERGY_LOCAL_URL="http://HomeServer.local:8099/v1"
