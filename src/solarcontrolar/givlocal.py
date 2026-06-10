@@ -115,8 +115,16 @@ class GivLocal(GivEnergyBase):
 
         return date_str, time_str, solar_total, usage_total
 
+    def _system_data_fix_datetime(self):
+        result = self.get(f"{self.base_url}/inverter/{self.inverter_id}/system-data-latest")
+        ts = result["data"].get("time", "")
+        if ts.startswith("2000-01-01"):
+            print("Date and Time corrected")
+            result["data"]["time"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        return result
+
     def battery_level(self):
-        return self.get(f"{self.base_url}/inverter/{self.inverter_id}/system-data-latest")['data']['battery']['percent']
+        return self._system_data_fix_datetime()['data']['battery']['percent']
 
     def system_data_latest(self):
-        return self.get(f"{self.base_url}/inverter/{self.inverter_id}/system-data-latest")
+        return self._system_data_fix_datetime()
