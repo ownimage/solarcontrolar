@@ -10,13 +10,29 @@
         .container { max-width: 1100px; margin: 0 auto; }
         h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #1a202c; }
 
-        /* Battery Display */
-        .battery-display { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .battery-icon { position: relative; width: 60px; height: 30px; border: 3px solid #2d3748; border-radius: 4px; flex-shrink: 0; }
+        /* Top Tiles Grid */
+        .top-tiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .tile { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.25rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 140px; }
+        .tile-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: #cbd5e0; font-weight: 700; margin-top: 0.85rem; }
+
+        /* Date Tile */
+        .date-dd { font-size: 3.5rem; font-weight: 200; color: #1a202c; line-height: 1; margin-bottom: 0.6rem; }
+        .date-meta { display: flex; gap: 0.8rem; align-items: center; }
+        .date-mon { font-size: 1.3rem; font-weight: 700; color: #4a5568; letter-spacing: 0.04em; }
+        .date-dot { width: 5px; height: 5px; background: #cbd5e0; border-radius: 50%; flex-shrink: 0; }
+        .date-yyy { font-size: 1.3rem; font-weight: 300; color: #718096; letter-spacing: 0.06em; }
+
+        /* Split-Flap Time */
+        .split-flap { display: flex; align-items: center; gap: 0.25rem; }
+        .flap-card { background: linear-gradient(180deg, #4a5568 0%, #2d3748 48%, #1a202c 52%, #171923 100%); color: #f7fafc; font-size: 2.4rem; font-weight: 300; width: 1.7rem; text-align: center; border-radius: 5px; padding: 0.4rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06); position: relative; letter-spacing: 0.06em; }
+        .flap-card::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0,0,0,0.45); box-shadow: 0 1px 2px rgba(255,255,255,0.04); }
+        .flap-sep { font-size: 2rem; font-weight: 700; color: #fc8181; margin: 0 0.08rem; position: relative; top: -0.15rem; animation: flapPulse 1s ease-in-out infinite; }
+        @keyframes flapPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+        /* Battery Tile */
+        .battery-icon { position: relative; width: 64px; height: 32px; border: 3px solid #2d3748; border-radius: 4px; flex-shrink: 0; margin-bottom: 0.5rem; }
         .battery-icon::after { content: ''; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); width: 5px; height: 12px; background: #2d3748; border-radius: 0 2px 2px 0; }
         .battery-fill { position: absolute; top: 3px; left: 3px; bottom: 3px; border-radius: 1px; transition: width 0.3s, background 0.3s; }
-        .battery-info { font-size: 2rem; font-weight: 700; color: #2d3748; }
-        .battery-sub { font-size: 0.85rem; color: #718096; margin-top: 0.25rem; }
 
         /* Tabs */
         .tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; }
@@ -65,18 +81,67 @@
     <div class="container">
         <h1>Solar Controlar</h1>
 
-        {% if power_data and 'battery' in power_data %}
-        <div class="battery-display">
-            <div class="battery-icon">
-                <div class="battery-fill" id="batteryFill"></div>
+        {% if power_data and 'battery' in power_data and power_date and power_time %}
+        <div class="top-tiles">
+            <!-- Date Tile -->
+            <div class="tile">
+                <div class="date-dd" id="dd"></div>
+                <div class="date-meta">
+                    <span class="date-mon" id="mon"></span>
+                    <span class="date-dot"></span>
+                    <span class="date-yyy" id="yyyy"></span>
+                </div>
             </div>
-            <div>
+            <!-- Time Tile -->
+            <div class="tile">
+                <div class="split-flap">
+                    <div class="flap-card" id="h1"></div>
+                    <div class="flap-card" id="h2"></div>
+                    <div class="flap-sep">:</div>
+                    <div class="flap-card" id="m1"></div>
+                    <div class="flap-card" id="m2"></div>
+                    <div class="flap-sep">:</div>
+                    <div class="flap-card" id="s1"></div>
+                    <div class="flap-card" id="s2"></div>
+                </div>
+                <span class="tile-label">Local Time</span>
+            </div>
+            <!-- Battery Tile -->
+            <div class="tile">
+                <div class="battery-icon">
+                    <div class="battery-fill" id="batteryFill"></div>
+                </div>
                 <div class="battery-info" id="batteryPercent">{{ power_data.battery }}%</div>
-                <div class="battery-sub">Battery Level</div>
+                <span class="tile-label">Battery Level</span>
             </div>
         </div>
         <script>
             (function() {
+                var rawDate = "{{ power_date }}";
+                var rawTime = "{{ power_time }}";
+
+                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+                if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+                    var dp = rawDate.split('-');
+                    document.getElementById('yyyy').textContent = dp[0];
+                    document.getElementById('dd').textContent   = String(parseInt(dp[2])).padStart(2,'0');
+                    document.getElementById('mon').textContent  = months[parseInt(dp[1]) - 1] || '';
+                }
+
+                if (/^\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
+                    var tp = rawTime.split(':');
+                    var hh = String(parseInt(tp[0])).padStart(2,'0');
+                    var mm = String(parseInt(tp[1])).padStart(2,'0');
+                    var ss = String(parseInt(tp[2])).padStart(2,'0');
+                    document.getElementById('h1').textContent = hh[0];
+                    document.getElementById('h2').textContent = hh[1];
+                    document.getElementById('m1').textContent = mm[0];
+                    document.getElementById('m2').textContent = mm[1];
+                    document.getElementById('s1').textContent = ss[0];
+                    document.getElementById('s2').textContent = ss[1];
+                }
+
                 var level = {{ power_data.battery }};
                 var fill = document.getElementById('batteryFill');
                 fill.style.width = Math.max(0, Math.min(100, level) - 6) + '%';
