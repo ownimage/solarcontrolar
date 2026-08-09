@@ -82,6 +82,9 @@
     <div class="container">
         <h1>Solar Controlar</h1>
 
+        {% set battery_raw = power_data.battery if power_data else none %}
+        {% set battery_valid = battery_raw is number and battery_raw >= 0 and battery_raw <= 100 %}
+
         {% if power_data and 'battery' in power_data and power_date and power_time %}
         <div class="top-tiles">
             <!-- Date Tile -->
@@ -112,7 +115,7 @@
                 <div class="battery-icon">
                     <div class="battery-fill" id="batteryFill"></div>
                 </div>
-                <div class="battery-info" id="batteryPercent">{{ power_data.battery }}%</div>
+                <div class="battery-info" id="batteryPercent">{% if battery_valid %}{{ power_data.battery }}%{% else %}Unknown{% endif %}</div>
                 <span class="tile-label">Battery Level</span>
             </div>
         </div>
@@ -143,12 +146,17 @@
                     document.getElementById('s2').textContent = ss[1];
                 }
 
-                var level = {{ power_data.battery }};
+                var level = {{ power_data.battery if battery_valid else 'null' }};
                 var fill = document.getElementById('batteryFill');
-                fill.style.width = Math.max(0, Math.min(100, level) - 6) + '%';
-                if (level <= 20) fill.style.background = '#e53e3e';
-                else if (level <= 50) fill.style.background = '#dd6b20';
-                else fill.style.background = '#38a169';
+                if (level === null) {
+                    fill.style.width = '0%';
+                    fill.style.background = '#cbd5e0';
+                } else {
+                    fill.style.width = Math.max(0, Math.min(100, level) - 6) + '%';
+                    if (level <= 20) fill.style.background = '#e53e3e';
+                    else if (level <= 50) fill.style.background = '#dd6b20';
+                    else fill.style.background = '#38a169';
+                }
             })();
         </script>
         {% endif %}
@@ -211,7 +219,7 @@
                     {% if 'battery' in power_data %}
                     <tr>
                         <td>Battery</td>
-                        <td>{{ power_data['battery'] }}%</td>
+                        <td>{% if battery_valid %}{{ power_data['battery'] }}%{% else %}Unknown{% endif %}</td>
                     </tr>
                     {% endif %}
                 </tbody>

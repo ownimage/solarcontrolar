@@ -126,21 +126,27 @@ class GivLocal(GivEnergyBase):
 
         return date_str, time_str, solar_total, usage_total
 
-    def _fetch_with_date_retry(self, url, extract_date, patch_date):
+    def _fetch_with_date_retry(self, url, extract_date, patch_date, is_bad=None):
         result = self.get(url)
-        if not self._is_bad_date(extract_date(result)):
+        if not self._is_bad_date(extract_date(result)) and not (is_bad and is_bad(result)):
             return result
 
-        print(f"Bad date/time from {url}, retrying")
+        print(f"Bad data from {url}, retrying")
         for delay in get_retry_delays():
             time.sleep(delay)
             result = self.get(url)
-            if not self._is_bad_date(extract_date(result)):
+            if not self._is_bad_date(extract_date(result)) and not (is_bad and is_bad(result)):
                 return result
 
-        print("Date and Time corrected")
-        patch_date(result)
+        if self._is_bad_date(extract_date(result)):
+            print("Date and Time corrected")
+            patch_date(result)
+        else:
+            print(f"Data still invalid from {url} after retries")
         return result
+
+    def _is_bad_battery(self, result):
+        return is_bad_battery_percent(result["data"].get("battery", {}).get("percent"))
 
     def _is_bad_date(self, ts):
         if not isinstance(ts, str) or not ts:
@@ -164,6 +170,7 @@ class GivLocal(GivEnergyBase):
             url=f"{self.base_url}/inverter/{self.inverter_id}/system-data-latest",
             extract_date=self._extract_time,
             patch_date=self._patch_time,
+            is_bad=self._is_bad_battery,
         )
 
     def battery_level(self):
@@ -185,3 +192,7 @@ def get_retry_delays():
         except ValueError:
             pass
     return delays if delays else [1, 2, 5, 10]
+
+
+def is_bad_battery_percent(battery):
+    return battery is None or battery < 0 or battery > 100
