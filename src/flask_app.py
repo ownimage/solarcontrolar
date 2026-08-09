@@ -13,13 +13,36 @@ app = Flask(
 
 # ⭐ Tell Flask it lives under /solar
 app.config['APPLICATION_ROOT'] = '/solar'
+# Session cookie must apply to all paths (/, /solar/*, /api/*) or it won't
+# be sent on POST, leaving the CSRF session token "missing".
+app.config['SESSION_COOKIE_PATH'] = '/'
 app.logger.setLevel(logging.DEBUG)
 
 csrf = CSRFProtect()
 csrf.init_app(app)
-app.secret_key = os.urandom(24)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+
+def _load_secret_key():
+    key_file = os.path.join(BASE_DIR, ".secret_key")
+    try:
+        with open(key_file, "r") as f:
+            key = f.read().strip()
+            if key:
+                return key
+    except FileNotFoundError:
+        pass
+    key = os.urandom(24).hex()
+    try:
+        with open(key_file, "w") as f:
+            f.write(key)
+    except Exception:
+        pass
+    return key
+
+
+app.secret_key = _load_secret_key()
 
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
