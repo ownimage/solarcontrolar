@@ -1,6 +1,9 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+import os
+import time
+
 import requests
 
 from .givenergybase import GivEnergyBase
@@ -102,7 +105,15 @@ class GivLocal(GivEnergyBase):
         return dict(weekly_usage)
 
     def get_meter_data_latest(self):
-        raw = self.get(f"{self.base_url}/inverter/{self.inverter_id}/meter-data-latest")["data"]
+        return self._get_meter_data_latest_fix_datetime()
+
+    def _get_meter_data_latest_fix_datetime(self):
+        result = self._fetch_with_date_retry(
+            url=f"{self.base_url}/inverter/{self.inverter_id}/meter-data-latest",
+            extract_date=self._extract_time,
+            patch_date=self._patch_time,
+        )
+        raw = result["data"]
 
         # split timestamp
         dt = datetime.fromisoformat(raw["time"])
@@ -115,16 +126,62 @@ class GivLocal(GivEnergyBase):
 
         return date_str, time_str, solar_total, usage_total
 
-    def _system_data_fix_datetime(self):
-        result = self.get(f"{self.base_url}/inverter/{self.inverter_id}/system-data-latest")
-        ts = result["data"].get("time", "")
-        if ts.startswith("2000-01-01"):
-            print("Date and Time corrected")
-            result["data"]["time"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    def _fetch_with_date_retry(self, url, extract_date, patch_date):
+        result = self.get(url)
+        if not self._is_bad_date(extract_date(result)):
+            return result
+
+        print(f"Bad date/time from {url}, retrying")
+        for delay in get_retry_delays():
+            time.sleep(delay)
+            result = self.get(url)
+            if not self._is_bad_date(extract_date(result)):
+                return result
+
+        print("Date and Time corrected")
+        patch_date(result)
         return result
+
+    def _is_bad_date(self, ts):
+        if not isinstance(ts, str) or not ts:
+            return True
+        if ts.startswith("2000-01-01"):
+            return True
+        try:
+            datetime.fromisoformat(ts)
+        except ValueError:
+            return True
+        return False
+
+    def _extract_time(self, result):
+        return result["data"].get("time", "")
+
+    def _patch_time(self, result):
+        result["data"]["time"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    def _system_data_fix_datetime(self):
+        return self._fetch_with_date_retry(
+            url=f"{self.base_url}/inverter/{self.inverter_id}/system-data-latest",
+            extract_date=self._extract_time,
+            patch_date=self._patch_time,
+        )
 
     def battery_level(self):
         return self._system_data_fix_datetime()['data']['battery']['percent']
 
     def system_data_latest(self):
         return self._system_data_fix_datetime()
+
+
+def get_retry_delays():
+    raw = os.getenv("GIVENERGY_RETRY_DELAYS", "1,2,5,10")
+    delays = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            delays.append(float(part))
+        except ValueError:
+            pass
+    return delays if delays else [1, 2, 5, 10]

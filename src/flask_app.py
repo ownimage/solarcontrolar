@@ -1,10 +1,20 @@
 import argparse
 import os
 import json
+import logging
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_wtf.csrf import CSRFProtect
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_url_path='/solar/static',
+    static_folder='static'
+)
+
+# ⭐ Tell Flask it lives under /solar
+app.config['APPLICATION_ROOT'] = '/solar'
+app.logger.setLevel(logging.DEBUG)
+
 csrf = CSRFProtect()
 csrf.init_app(app)
 app.secret_key = os.urandom(24)

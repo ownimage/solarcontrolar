@@ -1,5 +1,7 @@
 FROM docker.io/python:3.11-bookworm
 
+ENV TZ=Europe/London
+
 SHELL ["/bin/bash", "-c"]
 
 COPY . /app
