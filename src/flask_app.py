@@ -19,10 +19,20 @@ csrf = CSRFProtect()
 csrf.init_app(app)
 app.secret_key = os.urandom(24)
 
-SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "settings.json")
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
-LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config_apply.log")
-POWER_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "minute_power.json")
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+POWER_FILE = os.path.join(BASE_DIR, "minute_power.json")
+
+FILES = {
+    "config_apply": os.path.join(BASE_DIR, "config_apply.log"),
+    "minute_poller": os.path.join(BASE_DIR, "minute_poller.log"),
+    "forecast_pipeline": os.path.join(BASE_DIR, "forecast_pipeline.log"),
+    "minute_poller_state": os.path.join(BASE_DIR, "minute_poller_state.json"),
+    "minute_power": os.path.join(BASE_DIR, "minute_power.json"),
+    "minute_totals": os.path.join(BASE_DIR, "minute_totals.json"),
+}
 
 SETTINGS = [
     {
@@ -191,17 +201,21 @@ def update_config():
         flash(f"Error saving config: {str(e)}", "error")
     return redirect(url_for("index"))
 
-@app.route("/api/logs")
-def api_logs():
+@app.route("/api/files")
+def api_files():
+    file = request.args.get('file', 'config_apply', type=str)
+    if file not in FILES:
+        return f"Unknown file: {file}.", 400
+    file_path = FILES[file]
     count = request.args.get('count', 200, type=int)
     try:
-        if not os.path.exists(LOG_FILE):
-            return "Log file not found.", 404
-        with open(LOG_FILE, "r", errors="replace") as f:
+        if not os.path.exists(file_path):
+            return "File not found.", 404
+        with open(file_path, "r", errors="replace") as f:
             lines = f.readlines()
         return "".join(lines[-count:])
     except Exception as e:
-        return f"Error reading log: {str(e)}", 500
+        return f"Error reading file: {str(e)}", 500
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

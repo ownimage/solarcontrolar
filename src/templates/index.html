@@ -73,7 +73,8 @@
         /* Log Viewer */
         .log-controls { margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; }
         .log-input { width: 8rem; padding: 0.4rem 0.6rem; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 0.9rem; }
-        #log-output { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; height: 60vh; overflow-y: auto; line-height: 1.5; }
+        .log-select { width: 16rem; padding: 0.4rem 0.6rem; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 0.9rem; }
+        .log-output { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; height: 60vh; overflow-y: auto; line-height: 1.5; }
         .loading { color: #718096; font-style: italic; }
     </style>
 </head>
@@ -165,7 +166,7 @@
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('power')">Power</button>
             <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
-            <button class="tab-btn" onclick="switchTab('logs')">Logs</button>
+            <button class="tab-btn" onclick="switchTab('logs')">Files</button>
             <button class="tab-btn" onclick="switchTab('config')">Config</button>
         </div>
 
@@ -275,11 +276,20 @@
 
         <div id="tab-logs" class="tab-content">
             <div class="log-controls">
+                <label for="log-file">Log File:</label>
+                <select id="log-file" class="log-select">
+                    <option value="config_apply">config_apply.log</option>
+                    <option value="minute_poller">minute_poller.log</option>
+                    <option value="forecast_pipeline">forecast_pipeline.log</option>
+                    <option value="minute_poller_state">minute_poller_state.json</option>
+                    <option value="minute_power">minute_power.json</option>
+                    <option value="minute_totals">minute_totals.json</option>
+                </select>
                 <label for="line-count">Lines:</label>
                 <input type="number" id="line-count" class="log-input" min="1" max="10000" value="200">
                 <button type="button" onclick="fetchLogs()">Fetch</button>
             </div>
-            <div id="log-output">Click Fetch to load logs</div>
+            <div id="log-output" class="log-output">Click Fetch to load logs</div>
         </div>
 
         <div id="tab-config" class="tab-content">
@@ -333,12 +343,13 @@
         }
 
         async function fetchLogs() {
+            const file = document.getElementById('log-file').value;
             const count = document.getElementById('line-count').value || 200;
             const output = document.getElementById('log-output');
             output.textContent = 'Loading...';
             output.classList.add('loading');
             try {
-                const resp = await fetch(`/api/logs?count=${encodeURIComponent(count)}`);
+                const resp = await fetch(`/api/files?file=${encodeURIComponent(file)}&count=${encodeURIComponent(count)}`);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const text = await resp.text();
                 output.textContent = text;
