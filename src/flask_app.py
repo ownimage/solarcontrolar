@@ -55,6 +55,8 @@ FILES = {
     "minute_poller_state": os.path.join(BASE_DIR, "minute_poller_state.json"),
     "minute_power": os.path.join(BASE_DIR, "minute_power.json"),
     "minute_totals": os.path.join(BASE_DIR, "minute_totals.json"),
+    "solar_actuals": os.path.join(BASE_DIR, "solar_actuals.json"),
+    "usage_actuals": os.path.join(BASE_DIR, "usage_actuals.json"),
 }
 
 SETTINGS = [
