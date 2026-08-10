@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from common.json_store import JsonStore
 from filenames import Filenames
 from solarcontrolar.givenergyfactory import GivEnergyFactory
-from solarcontrolar.givlocal import get_retry_delays
+from solarcontrolar.givlocal import get_retry_delays, is_bad_battery_percent
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +71,15 @@ class MinutePoller:
         time_str = dt.time().isoformat()
 
         # Extract fields
-        battery = raw['battery']['percent']
+        battery = raw.get("battery", {}).get("percent")
         status = raw["status"]
         solar = raw["solar"]["power"]
         grid = raw["grid"]["power"]
         inverter = raw["inverter"]["power"]
         home = raw["consumption"]
+
+        if is_bad_battery_percent(battery):
+            logger.warning("Battery level %r outside 0-100, writing anyway (corrupt data)", battery)
 
         self._store_power_data(date_str, time_str, status, solar, grid, inverter, home, battery)
 
