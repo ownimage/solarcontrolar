@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import time
@@ -64,6 +65,7 @@ class MinutePoller:
 
     def _save_power_data(self, givenergy):
         raw = givenergy.system_data_latest()["data"]
+        logger.info("system-data-latest: %s", json.dumps(raw, separators=(",", ":")))
 
         # Split timestamp
         dt = datetime.fromisoformat(raw["time"])
@@ -106,8 +108,9 @@ class MinutePoller:
 
     def _save_meter_data_latest(self, givenergy):
         date_str, time_str, solar, usage = givenergy.get_meter_data_latest()
-        logger.debug("Meter reading: date=%s time=%s solar=%.3f usage=%.3f",
-                     date_str, time_str, solar, usage)
+        logger.info("meter-data-latest: %s", json.dumps(
+            {"date": date_str, "time": time_str, "solar": solar, "usage": usage},
+            separators=(",", ":")))
 
         try:
             now = datetime.fromisoformat(f"{date_str}T{time_str}")
@@ -129,7 +132,8 @@ class MinutePoller:
             return
 
         if not self._usage_plausible(anchor, now, usage):
-            retried = self._refetch_until_usage_plausible(givenergy, anchor, now)
+            retried = self._refetch_until_usage_plausible(
+                givenergy, anchor, now, date_str, time_str, solar, usage)
             if retried is None:
                 print("Usage still implausible, rejecting this minute's reading")
                 return
@@ -189,20 +193,32 @@ class MinutePoller:
             return False
         return True
 
-    def _refetch_until_usage_plausible(self, givenergy, anchor, now):
+    def _refetch_until_usage_plausible(self, givenergy, anchor, now,
+                                       date_str, time_str, solar, usage):
+        fetched = json.dumps({"date": date_str, "time": time_str,
+                              "solar": solar, "usage": usage}, separators=(",", ":"))
+        max_rate = self._max_usage_kwh_per_hour()
         print(f"Usage implausible vs anchor {anchor['boundary'].isoformat()} "
-              f"(max {self._max_usage_kwh_per_hour()} kWh/h), retrying meter data")
+              f"(anchor_solar={anchor['solar']}, anchor_usage={anchor['usage']}, "
+              f"max {max_rate} kWh/h): fetched={fetched}, retrying meter data")
         attempts = 0
         for delay in get_retry_delays():
             attempts += 1
             time.sleep(delay)
             date_str, time_str, solar, usage = givenergy.get_meter_data_latest()
+            logger.info("meter-data-latest: %s", json.dumps(
+                {"date": date_str, "time": time_str, "solar": solar, "usage": usage},
+                separators=(",", ":")))
             try:
                 retry_now = datetime.fromisoformat(f"{date_str}T{time_str}")
             except ValueError:
                 retry_now = now
             if self._usage_plausible(anchor, retry_now, usage):
-                logger.warning("Usage plausible after %d retry attempt(s)", attempts)
+                logger.warning("Usage plausible after %d retry attempt(s): fetched=%s",
+                               attempts, json.dumps(
+                                   {"date": date_str, "time": time_str,
+                                    "solar": solar, "usage": usage},
+                                   separators=(",", ":")))
                 return date_str, time_str, solar, usage
         return None
 

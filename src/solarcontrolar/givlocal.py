@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+import json
 import os
 import time
 
@@ -131,7 +132,8 @@ class GivLocal(GivEnergyBase):
         if not self._is_bad_date(extract_date(result)) and not (is_bad and is_bad(result)):
             return result
 
-        print(f"Bad data from {url}, retrying")
+        print(f"Bad data from {url}, retrying: "
+              f"{json.dumps(result, separators=(',', ':'), default=str)}")
         for delay in get_retry_delays():
             time.sleep(delay)
             result = self.get(url)
