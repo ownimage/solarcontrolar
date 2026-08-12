@@ -163,3 +163,177 @@ curl -X GET "https://api.givenergy.cloud/v1/inverter/FD2325G412/data?start=2024-
      -H "Accept: application/json"
 ```
 
+# Data Format
+{
+  "generation": "gen3",
+  "serialNumber": "FD2325G412",
+  "modelCode": 8193,
+  "solarPower": 1979,
+  "pvString1Power": 926,
+  "pvString2Power": 1053,
+  "batteryPower": -157,
+  "gridPower": 1190,
+  "loadPower": 517,
+  "inverterOutputPower": 1707,
+  "gridApparentPower": 1239,
+  "epsBackupPower": 0,
+  "pvString1Voltage": 183.7,
+  "pvString2Voltage": 217.9,
+  "pvString1Current": 5,
+  "pvString2Current": 4.8,
+  "stateOfCharge": 5,
+  "batteryVoltage": 48.2,
+  "batteryCurrent": -3.36,
+  "gridVoltage": 241,
+  "gridFrequency": 50,
+  "inverterCurrent": 7.2,
+  "epsBackupVoltage": 244.1,
+  "epsBackupFrequency": 50.04,
+  "inverterHeatsinkTemp": 57.8,
+  "chargerTemperature": 60.5,
+  "batteryTemperature": 24,
+  "pvEnergyTotalKwh": 10870.2,
+  "batteryChargeEnergyTotalKwh": 0,
+  "batteryDischargeEnergyTotalKwh": 2261.6,
+  "gridImportEnergyTotalKwh": 7152.2,
+  "gridExportEnergyTotalKwh": 8810.9,
+  "consumptionEnergyTotalKwh": 7644.5,
+  "batteryThroughputTotalKwh": 13674.6,
+  "hoursOfOperation": 18355,
+  "pvEnergyTodayKwh": 27.4,
+  "pvString1EnergyTodayKwh": 12.7,
+  "pvString2EnergyTodayKwh": 14.7,
+  "batteryChargeEnergyTodayKwh": 1.2,
+  "batteryDischargeEnergyTodayKwh": 2.5,
+  "gridImportEnergyTodayKwh": 3.6,
+  "gridExportEnergyTodayKwh": 23.3,
+  "consumptionEnergyTodayKwh": 8,
+  "chargeSlots": [
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    }
+  ],
+  "dischargeSlots": [
+    {
+      "start": "16:00",
+      "end": "18:30",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "18:30",
+      "end": "19:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    },
+    {
+      "start": "00:00",
+      "end": "00:00",
+      "targetStateOfCharge": 0
+    }
+  ],
+  "ecoMode": true,
+  "timedExport": true,
+  "timedCharge": false,
+  "chargeTargetStateOfCharge": 0,
+  "batteryReservePercent": 0,
+  "chargeRatePercent": 0,
+  "dischargeRatePercent": 0,
+  "batteryPauseMode": "disabled",
+  "timedDischargeSlot": {
+    "start": "00:00",
+    "end": "00:00"
+  },
+  "systemTime": "2026-08-11T18:10:17.000Z",
+  "powerFlows": {
+    "solarToHouse": 517,
+    "solarToBattery": 272,
+    "solarToGrid": 1190,
+    "batteryToHouse": 0,
+    "batteryToGrid": 0,
+    "gridToHouse": 0,
+    "gridToBattery": 0
+  },
+  "batteries": [],
+  "meters": []
+}
