@@ -1,10 +1,8 @@
-from datetime import datetime
-import os
 import asyncio
-
-from tenacity import retry, stop_after_attempt, wait_fixed
+import os
 
 from givenergy_modbus.client.client import Client
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 try:
     import fcntl
@@ -65,10 +63,11 @@ class PlantWrapper:
         self._battery_power = inv.battery_discharge_power - inv.battery_charge_power
         self._house_power = - inv.p_load_demand
         self._generation_total = inv.e_pv_generation_total
-        self._consumption_total = (
-                inv.e_pv_generation_total
-                + inv.e_grid_in_total - inv.e_grid_out_total
-                - inv.battery_capacity_kwh * inv.battery_soc / 100
+        self._consumption_total = round(
+            inv.e_pv_generation_total
+            + inv.e_grid_in_total - inv.e_grid_out_total
+            - inv.battery_capacity_kwh * inv.battery_soc / 100,
+            1
         )
         self._enable_discharge = inv.enable_discharge
         self._enable_charge = inv.enable_charge
@@ -135,6 +134,7 @@ class GivenergyModbus():
             raise ValueError("GIVENERGY_INVERTER_IP environment variable must be set")
         self.inverter_port = int(os.getenv('GIVENERGY_INVERTER_PORT', DEFAULT_PORT))
 
+    @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_fixed(RETRY_WAIT_SECONDS))
     async def read_data(self):
         lock = acquire_lock()
         try:
@@ -167,11 +167,9 @@ class GivenergyModbus():
             # print(f'wrapper enable discharge {wrapper.enable_discharge}')
             # print(f'wrapper enable charge {wrapper.enable_charge}')
 
-
             return plant
         finally:
             release_lock(lock)
-
 
     async def _get_plant(self):
         client = Client(host=self.inverter_ip, port=self.inverter_port)
@@ -211,7 +209,6 @@ class GivenergyModbus():
     @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_fixed(RETRY_WAIT_SECONDS))
     async def set_discharge(self, enabled):
         await self._set_battery_flag("set_enable_discharge", "enable_discharge", bool(enabled))
-
 
 
 if __name__ == "__main__":
