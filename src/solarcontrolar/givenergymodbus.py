@@ -142,21 +142,21 @@ class GivenergyModbus():
         try:
             plant = await self._get_plant()
             inv = plant.inverter
-            # print(f'battery charge percentage {inv.battery_soc}')
-            # print(f'system time {inv.system_time}')
-            # print(f'solar power {inv.p_pv()}')  # solar power
-            # print(f'grid import power {inv.grid_import_power}')
-            # print(f'grid export power {inv.grid_export_power}')
-            # print(f'battery charge power {inv.battery_charge_power}')
-            # print(f'battery discharge power {inv.battery_discharge_power}')
-            # print(f'house power {inv.p_load_demand}')
-            # print(f'generation total {inv.e_pv_generation_total}')
-            # print(f'battery capacity {inv.battery_capacity_kwh}')
-            # print(f'consumption total {inv.e_pv_generation_total + inv.e_grid_in_total - inv.e_grid_out_total - inv.battery_capacity_kwh * inv.battery_soc / 100}')
-            # print(f'enable discharge {inv.enable_discharge}')
-            # print(f'enable charge {inv.enable_charge}')
-            # print(f'status {inv.status.name}')
-            #
+            print(f'battery charge percentage {inv.battery_soc}')
+            print(f'system time {inv.system_time}')
+            print(f'solar power {inv.p_pv()}')  # solar power
+            print(f'grid import power {inv.grid_import_power}')
+            print(f'grid export power {inv.grid_export_power}')
+            print(f'battery charge power {inv.battery_charge_power}')
+            print(f'battery discharge power {inv.battery_discharge_power}')
+            print(f'house power {inv.p_load_demand}')
+            print(f'generation total {inv.e_pv_generation_total}')
+            print(f'battery capacity {inv.battery_capacity_kwh}')
+            print(f'consumption total {inv.e_pv_generation_total + inv.e_grid_in_total - inv.e_grid_out_total - inv.battery_capacity_kwh * inv.battery_soc / 100}')
+            print(f'enable discharge {inv.enable_discharge}')
+            print(f'enable charge {inv.enable_charge}')
+            print(f'status {inv.status.name}')
+
             wrapper = PlantWrapper(plant)
             print(f'wrapper battery percentage {wrapper.battery_percentage}')
             print(f'wrapper system time {wrapper.system_time}')
@@ -231,17 +231,17 @@ if __name__ == "__main__":
     SEPARATOR = "\n" + ("=" * 60) + "\n"
     givenergy_modbus = GivenergyModbus()
 
-    # --- set_enable_charge ---
-    start = time.perf_counter()
-    asyncio.run(givenergy_modbus.set_enable_charge(False))
-    end = time.perf_counter()
-    print(f"{SEPARATOR}set_enable_charge() took {end - start:.3f} seconds{SEPARATOR}")
-
-    # --- set_enable_discharge ---
-    start = time.perf_counter()
-    asyncio.run(givenergy_modbus.set_enable_discharge(False))
-    end = time.perf_counter()
-    print(f"{SEPARATOR}set_enable_discharge() took {end - start:.3f} seconds{SEPARATOR}")
+    # # --- set_enable_charge ---
+    # start = time.perf_counter()
+    # asyncio.run(givenergy_modbus.set_enable_charge(False))
+    # end = time.perf_counter()
+    # print(f"{SEPARATOR}set_enable_charge() took {end - start:.3f} seconds{SEPARATOR}")
+    #
+    # # --- set_enable_discharge ---
+    # start = time.perf_counter()
+    # asyncio.run(givenergy_modbus.set_enable_discharge(False))
+    # end = time.perf_counter()
+    # print(f"{SEPARATOR}set_enable_discharge() took {end - start:.3f} seconds{SEPARATOR}")
 
     # --- read_data ---
     start = time.perf_counter()
