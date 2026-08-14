@@ -114,11 +114,10 @@ def _decode_snapshot(ir: list, hr: list, hr_enable_charge: int) -> InverterSnaps
     e_grid_in_total = _uint32(ir[32], ir[33]) / 10 if None not in (ir[32], ir[33]) else None
     e_grid_out_total = _uint32(ir[21], ir[22]) / 10 if None not in (ir[21], ir[22]) else None
     battery_soc = ir[59]
-    if None not in (generation_total, e_grid_in_total, e_grid_out_total, battery_capacity_kwh, battery_soc):
-        consumption_total = round(
-            generation_total + e_grid_in_total - e_grid_out_total - battery_capacity_kwh * battery_soc / 100,
-            1,
-        )
+    if None not in (generation_total, e_grid_in_total, e_grid_out_total):
+        # Energy balance treating the battery as internal storage: the battery term
+        # dropped here swung with SoC, making the total go backwards on every charge.
+        consumption_total = round(generation_total + e_grid_in_total - e_grid_out_total, 1)
     else:
         consumption_total = None
 
@@ -187,10 +186,11 @@ class PlantWrapper:
         self._battery_power = inv.battery_discharge_power - inv.battery_charge_power
         self._house_power = - inv.p_load_demand
         self._generation_total = inv.e_pv_generation_total
+        # Energy balance treating the battery as internal storage (the battery SoC term
+        # previously subtracted here made the total go backwards on every charge cycle).
         self._consumption_total = round(
             inv.e_pv_generation_total
-            + inv.e_grid_in_total - inv.e_grid_out_total
-            - inv.battery_capacity_kwh * inv.battery_soc / 100,
+            + inv.e_grid_in_total - inv.e_grid_out_total,
             1
         )
         self._enable_discharge = inv.enable_discharge
@@ -274,7 +274,7 @@ class GivenergyModbus():
             print(f'house power {inv.p_load_demand}')
             print(f'generation total {inv.e_pv_generation_total}')
             print(f'battery capacity {inv.battery_capacity_kwh}')
-            print(f'consumption total {inv.e_pv_generation_total + inv.e_grid_in_total - inv.e_grid_out_total - inv.battery_capacity_kwh * inv.battery_soc / 100}')
+            print(f'consumption total {inv.e_pv_generation_total + inv.e_grid_in_total - inv.e_grid_out_total}')
             print(f'enable discharge {inv.enable_discharge}')
             print(f'enable charge {inv.enable_charge}')
             print(f'status {inv.status.name}')
@@ -322,20 +322,20 @@ class GivenergyModbus():
             snapshot = _decode_snapshot(
                 responses[0].register_values, responses[1].register_values, responses[2].register_values[0]
             )
-            # print(f'battery charge percentage {snapshot.battery_soc}')
-            # print(f'system time {snapshot.system_time}')
-            # print(f'solar power {snapshot.solar_power}')  # solar power
-            # print(f'grid import power {snapshot.grid_import_power}')
-            # print(f'grid export power {snapshot.grid_export_power}')
-            # print(f'battery charge power {snapshot.battery_charge_power}')
-            # print(f'battery discharge power {snapshot.battery_discharge_power}')
-            # print(f'house power {snapshot.house_power}')
-            # print(f'generation total {snapshot.generation_total}')
-            # print(f'battery capacity {snapshot.battery_capacity_kwh}')
-            # print(f'consumption total {snapshot.consumption_total}')
-            # print(f'enable discharge {snapshot.enable_discharge}')
-            # print(f'enable charge {snapshot.enable_charge}')
-            # print(f'status {snapshot.status}')
+            print(f'battery charge percentage {snapshot.battery_soc}')
+            print(f'system time {snapshot.system_time}')
+            print(f'solar power {snapshot.solar_power}')  # solar power
+            print(f'grid import power {snapshot.grid_import_power}')
+            print(f'grid export power {snapshot.grid_export_power}')
+            print(f'battery charge power {snapshot.battery_charge_power}')
+            print(f'battery discharge power {snapshot.battery_discharge_power}')
+            print(f'house power {snapshot.house_power}')
+            print(f'generation total {snapshot.generation_total}')
+            print(f'battery capacity {snapshot.battery_capacity_kwh}')
+            print(f'consumption total {snapshot.consumption_total}')
+            print(f'enable discharge {snapshot.enable_discharge}')
+            print(f'enable charge {snapshot.enable_charge}')
+            print(f'status {snapshot.status}')
             return snapshot
         finally:
             release_lock(lock)
