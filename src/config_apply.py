@@ -1,24 +1,24 @@
-import os
+import asyncio
 import datetime
-import logging
 import json
+import logging
+import os
+import sys
 
 import pytz
-from tenacity import retry, stop_after_attempt, wait_fixed
 
 from common.json_store import JsonStore
-from solarcontrolar.givenergyfactory import GivEnergyFactory
+from common.logging_setup import setup_logging
+from solarcontrolar.givenergymodbus import GivenergyModbus, PlantWrapper
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 class ConfigApply:
-    def __init__(self, config=JsonStore("config.json"), os=os, json=json, GivEnergyFactory=GivEnergyFactory(), pytz=pytz, datetime=datetime, logger=logger):
+    def __init__(self, config=JsonStore("config.json"), os=os, json=json, pytz=pytz, datetime=datetime, logger=logger):
         self.__config = config
         self.__os = os
         self.__json = json
-        self.__GivEnergyFactory = GivEnergyFactory
         self.__pytz = pytz
         self.__datetime = datetime
         self.__logger = logger
@@ -27,23 +27,20 @@ class ConfigApply:
         with open("settings.json", "r") as file:
             return self.__json.load(file)
 
-    def get_givenergy(self):
-        return self.__GivEnergyFactory.instance()
-
     def get_current_time(self, timezone_str="Europe/London"):
         local_tz = self.__pytz.timezone(timezone_str)
         now = self.__datetime.datetime.now(local_tz)
         return now, now.strftime("%Y-%m-%d %H:%M:%S")
 
-    # @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
-    def charge_to_percentage(self, givenergy, tolerance, formatted_date):
+    async def charge_to_percentage(self, tolerance, formatted_date):
         target_percentage = self.__config.read()["charge_to_percentage"]
-        battery_level = givenergy.battery_level()
+        data = await GivenergyModbus().read_data_direct()
+        battery_level = data.battery_percentage
         enabled = battery_level <= target_percentage
 
         if abs(battery_level - target_percentage) > tolerance:
-            result = givenergy.set_timed_charge(enabled)
-            if result:
+            changed = await GivenergyModbus().set_enable_charge(enabled)
+            if changed:
                 msg = f"{formatted_date} battery_level={battery_level} target_percentage={target_percentage} CHANGE set_timed_charge({enabled})"
             else:
                 msg = f"{formatted_date} battery_level={battery_level} target_percentage={target_percentage} set_timed_charge({enabled})"
@@ -53,14 +50,14 @@ class ConfigApply:
         self.__logger.info(msg)
         return msg  # Allows assertion in unit tests
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
-    def limit_timed_export(self, givenergy, target_percentage, tolerance, formatted_date):
-        battery_level = givenergy.battery_level()
+    async def limit_timed_export(self,  target_percentage, tolerance, formatted_date):
+        data = await GivenergyModbus().read_data_direct()
+        battery_level = data.battery_soc
         enabled = battery_level >= target_percentage
 
         if abs(battery_level - target_percentage) > tolerance:
-            result = givenergy.set_timed_export(enabled)
-            if result:
+            changed = await GivenergyModbus().set_enable_discharge(enabled)
+            if changed:
                 msg = f"{formatted_date} battery_level={battery_level} target_percentage={target_percentage} CHANGE set_timed_export({enabled})"
             else:
                 msg = f"{formatted_date} battery_level={battery_level} target_percentage={target_percentage} set_timed_export({enabled})"
@@ -70,18 +67,6 @@ class ConfigApply:
         self.__logger.info(msg)
         return msg  # Allows assertion in unit tests
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(10))
-    def full_discharge(self, givenergy, formatted_date):
-        battery_level = givenergy.battery_level()
-
-        result = givenergy.set_timed_export(True)
-        if result:
-            msg = f"{formatted_date} battery_level={battery_level} target_percentage=0 CHANGE set_timed_export(True)"
-        else:
-            msg = f"{formatted_date} battery_level={battery_level} target_percentage=0 set_timed_export(True)"
-
-        self.__logger.info(msg)
-        return msg  # Allows assertion in unit tests
 
     @staticmethod
     def calc_limited_discharge_target(start_discharge_target, last_30mins_discharge_target, hour, minute):
@@ -93,9 +78,7 @@ class ConfigApply:
         else:
             raise BaseException(f"Invalid hour={hour} or minute={minute}, or not in discharge window.")
 
-    # Main function for better testability
-    def main(self):
-        givenergy = self.get_givenergy()
+    async def run(self):
         settings = self.get_settings()
         tolerance = settings["tolerance_percent"]
         start_discharge_target = settings["start_discharge_target"]
@@ -105,14 +88,15 @@ class ConfigApply:
         hour = now.hour
         minute = now.minute
 
-        if 2 <= hour < 5:
-            return self.charge_to_percentage(givenergy, tolerance, formatted_date)
+        if 2 <= hour < 10:
+            return await self.charge_to_percentage(tolerance, formatted_date)
         elif 16 <= hour < 19:
             if hour < 18 or minute < 30:  # not last half-hour drain immediately to init_discharge_target
                 target = self.calc_limited_discharge_target(start_discharge_target, last_30mins_discharge_target, hour, minute)
-                return self.limit_timed_export(givenergy, target, tolerance, formatted_date)
+                return await self.limit_timed_export(target, tolerance, formatted_date)
             else:  # last half-hour drain to floor
-                return self.full_discharge(givenergy, formatted_date)
+                min_charge_percentage = 100.0 * settings["battery_min_kWh"] / settings["battery_capacity_kWh"]
+                return await self.limit_timed_export(min_charge_percentage, 0, formatted_date)
 
         else:
             msg = f"{formatted_date} no action"
@@ -121,4 +105,13 @@ class ConfigApply:
 
 
 if __name__ == "__main__":
-    ConfigApply().main()
+    setup_logging(stream=sys.stdout)
+
+    class _ConfigApplyOnly(logging.Filter):
+        def filter(self, record):
+            return record.name == __name__
+
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(_ConfigApplyOnly())
+
+    asyncio.run(ConfigApply().run())
