@@ -88,7 +88,7 @@ class ConfigApply:
         hour = now.hour
         minute = now.minute
 
-        if 2 <= hour < 10:
+        if 2 <= hour < 5:
             return await self.charge_to_percentage(tolerance, formatted_date)
         elif 16 <= hour < 19:
             if hour < 18 or minute < 30:  # not last half-hour drain immediately to init_discharge_target
