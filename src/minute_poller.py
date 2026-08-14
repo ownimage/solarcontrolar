@@ -97,12 +97,12 @@ class MinutePoller:
 
         return {"boundary": anchor_boundary, "solar": anchor_solar, "usage": anchor_usage}
 
-    def get_meter_data_latest(self, plantWrapper: PlantWrapper):
-        date_str = plantWrapper.date_str
-        time_str = plantWrapper.time_str
+    def get_meter_data_latest(self, data: InverterSnapshot):
+        date_str = data.date_str
+        time_str = data.time_str
 
-        solar_total = plantWrapper.generation_total
-        usage_total = plantWrapper.consumption_total
+        solar_total = data.generation_total
+        usage_total = data.consumption_total
         return date_str, time_str, solar_total, usage_total
 
     def _save_meter_data_latest(self, data: InverterSnapshot):
