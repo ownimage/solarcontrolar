@@ -129,7 +129,7 @@ class GivenergyModbus():
 
     def __init__(self):
         self.inverter_ip = os.getenv('GIVENERGY_INVERTER_IP')
-        print(self.inverter_ip)
+        # print(self.inverter_ip)
         if self.inverter_ip is None:
             raise ValueError("GIVENERGY_INVERTER_IP environment variable must be set")
         self.inverter_port = int(os.getenv('GIVENERGY_INVERTER_PORT', DEFAULT_PORT))
@@ -153,7 +153,7 @@ class GivenergyModbus():
             # print(f'consumption total {inv.e_pv_generation_total + inv.e_grid_in_total - inv.e_grid_out_total - inv.battery_capacity_kwh * inv.battery_soc / 100}')
             # print(f'enable discharge {inv.enable_discharge}')
             # print(f'enable charge {inv.enable_charge}')
-            print(f'status {inv.status.name}')
+            # print(f'status {inv.status.name}')
             #
             # wrapper = PlantWrapper(plant)
             # print(f'wrapper battery percentage {wrapper.battery_percentage}')
@@ -189,6 +189,8 @@ class GivenergyModbus():
             await client.connect()
             try:
                 await client.detect()
+                await client.load_config()
+                before = getattr(client.plant.inverter, reader)
                 inverter = client.plant.inverter
                 await client.one_shot_command(getattr(inverter, setter)(value))
                 await client.load_config()
@@ -197,21 +199,25 @@ class GivenergyModbus():
                     raise RuntimeError(
                         f"battery {reader} write not confirmed: wanted={value} actual={actual}"
                     )
+                changed =  before != actual
+                return changed
             finally:
                 await client.close()
         finally:
             release_lock(lock)
 
     @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_fixed(RETRY_WAIT_SECONDS))
-    async def set_charge(self, enabled):
-        await self._set_battery_flag("set_enable_charge", "enable_charge", bool(enabled))
+    async def set_enable_charge(self, enabled):
+        return await self._set_battery_flag("set_enable_charge", "enable_charge", bool(enabled))
 
     @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_fixed(RETRY_WAIT_SECONDS))
-    async def set_discharge(self, enabled):
-        await self._set_battery_flag("set_enable_discharge", "enable_discharge", bool(enabled))
+    async def set_enable_discharge(self, enabled):
+        return await self._set_battery_flag("set_enable_discharge", "enable_discharge", bool(enabled))
+
 
 
 if __name__ == "__main__":
     givenergy_modbus = GivenergyModbus()
-    # asyncio.run(givenergy_modbus.set_charge(False))
+    asyncio.run(givenergy_modbus.set_enable_charge(False))
+    asyncio.run(givenergy_modbus.set_enable_discharge(False))
     asyncio.run(givenergy_modbus.read_data())

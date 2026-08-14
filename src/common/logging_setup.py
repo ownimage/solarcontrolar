@@ -8,7 +8,7 @@ _DETAILED_FORMAT = "%(asctime)s %(levelname)-7s %(name)s - %(message)s"
 _configured = False
 
 
-def setup_logging():
+def setup_logging(stream=None):
     global _configured
     if _configured:
         return logging.getLogger()
@@ -17,13 +17,13 @@ def setup_logging():
     level = _level_from_env()
 
     if level is None:
-        logging.basicConfig(level=logging.INFO, format=_PLAIN_FORMAT, force=True)
+        logging.basicConfig(level=logging.INFO, format=_PLAIN_FORMAT, force=True, stream=stream)
         return logging.getLogger()
 
     root = logging.getLogger()
     for handler in root.handlers:
         root.removeHandler(handler)
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(stream or sys.stdout)
     handler.setFormatter(logging.Formatter(_DETAILED_FORMAT))
     root.addHandler(handler)
     root.setLevel(level)

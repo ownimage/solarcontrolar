@@ -31,7 +31,7 @@ class MinutePoller:
               f"({entry_count} {'entry' if entry_count == 1 else 'entries'})")
         return data
 
-    def _store_power_data(self, date_str, time_str, status, solar, grid, home, battery):
+    def _store_power_data(self, date_str, time_str, status, solar, grid, home, battery, battery_level):
         power_store = JsonStore(Filenames.MINUTE_POWER_FILE.value)
         data = power_store.read()
 
@@ -43,12 +43,13 @@ class MinutePoller:
             "solar": solar,
             "grid": grid,
             "home": home,
-            "battery": battery
+            "battery": battery,
+            "battery_level": battery_level
         }
         power_store.write(data)
         entry_count = len(data)
         print(f"{Filenames.MINUTE_POWER_FILE.value}: {date_str} {time_str} status={status} "
-              f"solar={solar} grid={grid} home={home} battery={battery} "
+              f"solar={solar} grid={grid} home={home} battery={battery} battery_level={battery_level}"
               f"({entry_count} {'entry' if entry_count == 1 else 'entries'})")
         return data
 
@@ -72,8 +73,9 @@ class MinutePoller:
         grid = plantWrapper.grid_power
         home = plantWrapper.house_power
         battery = plantWrapper.battery_power
+        battery_level = plantWrapper._battery_soc
 
-        self._store_power_data(date_str, time_str, status, solar, grid, home, battery)
+        self._store_power_data(date_str, time_str, status, solar, grid, home, battery, battery_level)
 
     def _load_anchor(self, now):
         anchor = self.__state.read()
@@ -141,8 +143,8 @@ class MinutePoller:
 
         if current_boundary > anchor_boundary:
             # value is calculated and written when the first reading from the next period happens
-            solar_delta = solar - anchor["solar"]
-            usage_delta = usage - anchor["usage"]
+            solar_delta = round(solar - anchor["solar"], 1)
+            usage_delta = round(usage - anchor["usage"], 1)
 
             half_hour_key = anchor_boundary.strftime("%H:%M")
             date_key = anchor_boundary.date().isoformat()

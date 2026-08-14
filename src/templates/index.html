@@ -82,7 +82,7 @@
     <div class="container">
         <h1>Solar Controlar</h1>
 
-        {% set battery_raw = power_data.battery if power_data else none %}
+        {% set battery_raw = power_data.battery_level if power_data else none %}
         {% set battery_valid = battery_raw is number and battery_raw >= 0 and battery_raw <= 100 %}
 
         {% if power_data and 'battery' in power_data and power_date and power_time %}
@@ -115,7 +115,7 @@
                 <div class="battery-icon">
                     <div class="battery-fill" id="batteryFill"></div>
                 </div>
-                <div class="battery-info" id="batteryPercent">{% if battery_valid %}{{ power_data.battery }}%{% else %}Unknown{% endif %}</div>
+                <div class="battery-info" id="batteryPercent">{% if battery_valid %}{{ power_data.battery_level }}%{% else %}Unknown{% endif %}</div>
                 <span class="tile-label">Battery Level</span>
             </div>
         </div>
@@ -146,7 +146,7 @@
                     document.getElementById('s2').textContent = ss[1];
                 }
 
-                var level = {{ power_data.battery if battery_valid else 'null' }};
+                var level = {{ power_data.battery_level if battery_valid else 'null' }};
                 var fill = document.getElementById('batteryFill');
                 if (level === null) {
                     fill.style.width = '0%';
@@ -219,7 +219,7 @@
                     {% if 'battery' in power_data %}
                     <tr>
                         <td>Battery</td>
-                        <td>{% if battery_valid %}{{ power_data['battery'] }}%{% else %}Unknown{% endif %}</td>
+                        <td>{% if battery_valid %}{{ power_data['battery_level'] }}%{% else %}Unknown{% endif %}</td>
                     </tr>
                     {% endif %}
                 </tbody>
