@@ -1,7 +1,9 @@
 import asyncio
 import os
+import time
 
 from givenergy_modbus.client.client import Client
+from givenergy_modbus.pdu import ReadHoldingRegistersRequest, WriteHoldingRegisterRequest
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 try:
@@ -155,17 +157,17 @@ class GivenergyModbus():
             # print(f'enable charge {inv.enable_charge}')
             # print(f'status {inv.status.name}')
             #
-            # wrapper = PlantWrapper(plant)
-            # print(f'wrapper battery percentage {wrapper.battery_percentage}')
-            # print(f'wrapper system time {wrapper.system_time}')
-            # print(f'wrapper solar power {wrapper.solar_power}')
-            # print(f'wrapper grid power {wrapper.grid_power}')
-            # print(f'wrapper battery power {wrapper.battery_power}')
-            # print(f'wrapper house power {wrapper.house_power}')
-            # print(f'wrapper generation total {wrapper.generation_total}')
-            # print(f'wrapper consumption total {wrapper.consumption_total}')
-            # print(f'wrapper enable discharge {wrapper.enable_discharge}')
-            # print(f'wrapper enable charge {wrapper.enable_charge}')
+            wrapper = PlantWrapper(plant)
+            print(f'wrapper battery percentage {wrapper.battery_percentage}')
+            print(f'wrapper system time {wrapper.system_time}')
+            print(f'wrapper solar power {wrapper.solar_power}')
+            print(f'wrapper grid power {wrapper.grid_power}')
+            print(f'wrapper battery power {wrapper.battery_power}')
+            print(f'wrapper house power {wrapper.house_power}')
+            print(f'wrapper generation total {wrapper.generation_total}')
+            print(f'wrapper consumption total {wrapper.consumption_total}')
+            print(f'wrapper enable discharge {wrapper.enable_discharge}')
+            print(f'wrapper enable charge {wrapper.enable_charge}')
 
             return plant
         finally:
@@ -182,25 +184,35 @@ class GivenergyModbus():
             await client.close()
         return client.plant
 
-    async def _set_battery_flag(self, setter, reader, value):
+    async def _read_holding_register(self, client, register):
+        response = await client.send_request_and_await_response(
+            ReadHoldingRegistersRequest(
+                base_register=register,  # register 96 = enable charge
+                register_count=1,
+                device_address=0x11,  # inverter's setup address (same default the write uses)
+            ),
+            timeout=1.5,
+            retries=0,
+        )
+        return response.register_values[0]
+
+
+    async def _set_battery_flag(self, register: int, enabled : bool):
+        value = 1 if enabled else 0
         lock = acquire_lock()
         try:
             client = Client(host=self.inverter_ip, port=self.inverter_port)
             await client.connect()
             try:
-                await client.detect()
-                await client.load_config()
-                before = getattr(client.plant.inverter, reader)
-                inverter = client.plant.inverter
-                await client.one_shot_command(getattr(inverter, setter)(value))
-                await client.load_config()
-                actual = getattr(client.plant.inverter, reader)
-                if actual != value:
-                    raise RuntimeError(
-                        f"battery {reader} write not confirmed: wanted={value} actual={actual}"
-                    )
-                changed =  before != actual
-                return changed
+                before = await self._read_holding_register(client, register)
+                if before == value:
+                    print('no change')
+                    return True
+                write_request = WriteHoldingRegisterRequest(register, value)
+                await client.one_shot_command([write_request])
+                before = await self._read_holding_register(client, register)
+                print('changed')
+                return before != value
             finally:
                 await client.close()
         finally:
@@ -208,16 +220,31 @@ class GivenergyModbus():
 
     @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_fixed(RETRY_WAIT_SECONDS))
     async def set_enable_charge(self, enabled):
-        return await self._set_battery_flag("set_enable_charge", "enable_charge", bool(enabled))
+        return await self._set_battery_flag(96, enabled)
 
     @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_fixed(RETRY_WAIT_SECONDS))
     async def set_enable_discharge(self, enabled):
-        return await self._set_battery_flag("set_enable_discharge", "enable_discharge", bool(enabled))
-
+        return await self._set_battery_flag(59, enabled)
 
 
 if __name__ == "__main__":
+    SEPARATOR = "\n" + ("=" * 60) + "\n"
     givenergy_modbus = GivenergyModbus()
+
+    # --- set_enable_charge ---
+    start = time.perf_counter()
     asyncio.run(givenergy_modbus.set_enable_charge(False))
+    end = time.perf_counter()
+    print(f"{SEPARATOR}set_enable_charge() took {end - start:.3f} seconds{SEPARATOR}")
+
+    # --- set_enable_discharge ---
+    start = time.perf_counter()
     asyncio.run(givenergy_modbus.set_enable_discharge(False))
+    end = time.perf_counter()
+    print(f"{SEPARATOR}set_enable_discharge() took {end - start:.3f} seconds{SEPARATOR}")
+
+    # --- read_data ---
+    start = time.perf_counter()
     asyncio.run(givenergy_modbus.read_data())
+    end = time.perf_counter()
+    print(f"{SEPARATOR}read_data() took {end - start:.3f} seconds{SEPARATOR}")
