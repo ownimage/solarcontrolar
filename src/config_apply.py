@@ -34,9 +34,8 @@ class ConfigApply:
 
     async def charge_to_percentage(self, tolerance, formatted_date):
         target_percentage = self.__config.read()["charge_to_percentage"]
-        plant = await GivenergyModbus().read_data()
-        plant_wrapper = PlantWrapper(plant)
-        battery_level = plant_wrapper.battery_percentage
+        data = await GivenergyModbus().read_data_direct()
+        battery_level = data.battery_percentage
         enabled = battery_level <= target_percentage
 
         if abs(battery_level - target_percentage) > tolerance:
@@ -52,9 +51,8 @@ class ConfigApply:
         return msg  # Allows assertion in unit tests
 
     async def limit_timed_export(self,  target_percentage, tolerance, formatted_date):
-        plant = await GivenergyModbus().read_data()
-        plant_wrapper = PlantWrapper(plant)
-        battery_level = plant_wrapper.battery_percentage
+        data = await GivenergyModbus().read_data_direct()
+        battery_level = data.battery_soc
         enabled = battery_level >= target_percentage
 
         if abs(battery_level - target_percentage) > tolerance:

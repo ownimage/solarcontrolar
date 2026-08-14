@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from common.json_store import JsonStore
 from filenames import Filenames
-from solarcontrolar.givenergymodbus import GivenergyModbus, PlantWrapper
+from solarcontrolar.givenergymodbus import GivenergyModbus, PlantWrapper, InverterSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -57,23 +57,22 @@ class MinutePoller:
         print("============================================================================")
         print("Current time:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-        plant = await GivenergyModbus().read_data()
-        plantWrapper = PlantWrapper(plant)
-        self._save_meter_data_latest(plantWrapper)
-        self._save_power_data(plantWrapper)
+        data = await GivenergyModbus().read_data_direct()
+        self._save_meter_data_latest(data)
+        self._save_power_data(data)
 
-    def _save_power_data(self, plantWrapper: PlantWrapper):
-        logger.info("system-data-latest: %s", plantWrapper.system_time)
+    def _save_power_data(self, data: InverterSnapshot):
+        logger.info("system-data-latest: %s", data.system_time)
 
-        date_str = plantWrapper.date_str
-        time_str = plantWrapper.time_str
+        date_str = data.date_str
+        time_str = data.time_str
 
-        status = plantWrapper.status
-        solar = plantWrapper.solar_power
-        grid = plantWrapper.grid_power
-        home = plantWrapper.house_power
-        battery = plantWrapper.battery_power
-        battery_level = plantWrapper._battery_soc
+        status = data.status
+        solar = data.solar_power
+        grid = data.grid_power
+        home = data.house_power
+        battery = data.battery_power
+        battery_level = data.battery_soc
 
         self._store_power_data(date_str, time_str, status, solar, grid, home, battery, battery_level)
 
@@ -106,8 +105,8 @@ class MinutePoller:
         usage_total = plantWrapper.consumption_total
         return date_str, time_str, solar_total, usage_total
 
-    def _save_meter_data_latest(self, plantWrapper: PlantWrapper):
-        date_str, time_str, solar, usage = self.get_meter_data_latest(plantWrapper)
+    def _save_meter_data_latest(self, data: InverterSnapshot):
+        date_str, time_str, solar, usage = self.get_meter_data_latest(data)
         logger.info("meter-data-latest: %s", json.dumps(
             {"date": date_str, "time": time_str, "solar": solar, "usage": usage},
             separators=(",", ":")))
