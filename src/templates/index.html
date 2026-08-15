@@ -80,7 +80,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>Solar Controlar</h1>
+        <h1 style="display:flex; align-items:center; justify-content:space-between;">Solar Controlar
+            <button type="button" class="refresh-btn" onclick="location.reload()">Refresh</button>
+        </h1>
 
         {% set battery_raw = power_data.battery_level if power_data else none %}
         {% set battery_valid = battery_raw is number and battery_raw >= 0 and battery_raw <= 100 %}
@@ -116,7 +118,7 @@
                     <div class="battery-fill" id="batteryFill"></div>
                 </div>
                 <div class="battery-info" id="batteryPercent">{% if battery_valid %}{{ power_data.battery_level }}%{% else %}Unknown{% endif %}</div>
-                <span class="tile-label">Battery Level</span>
+                <span class="tile-label">Battery Charge</span>
             </div>
         </div>
         <script>
@@ -209,8 +211,8 @@
                         <td>{{ power_data.get('grid', '-') }} W</td>
                     </tr>
                     <tr>
-                        <td>Inverter</td>
-                        <td>{{ power_data.get('inverter', '-') }} W</td>
+                        <td>Battery</td>
+                        <td>{{ power_data.get('battery', '-') }} W</td>
                     </tr>
                     <tr>
                         <td>Home</td>
@@ -218,7 +220,7 @@
                     </tr>
                     {% if 'battery' in power_data %}
                     <tr>
-                        <td>Battery</td>
+                        <td>Battery Charge</td>
                         <td>{% if battery_valid %}{{ power_data['battery_level'] }}%{% else %}Unknown{% endif %}</td>
                     </tr>
                     {% endif %}
