@@ -366,6 +366,7 @@
                     <label><input type="checkbox" class="graph-series" value="battery" checked> Battery</label>
                     <label><input type="checkbox" class="graph-series" value="battery_level" checked> Battery Level</label>
                 </span>
+                <label class="graph-points"><input type="checkbox" id="graph-points" checked> Data Points</label>
             </div>
             <div class="graph-wrap">
                 <canvas id="powerChart"></canvas>
@@ -467,6 +468,7 @@
 
         function renderGraph(times, seriesData, visible) {
             const ctx = document.getElementById('powerChart').getContext('2d');
+            const showPoints = document.getElementById('graph-points').checked;
             const datasets = [];
             Object.keys(SERIES).forEach(function (key) {
                 datasets.push({
@@ -475,7 +477,8 @@
                     borderColor: SERIES[key].color,
                     backgroundColor: SERIES[key].color,
                     borderWidth: 2,
-                    pointRadius: 2,
+                    pointRadius: showPoints ? 2 : 0,
+                    pointHoverRadius: showPoints ? 2 : 0,
                     tension: 0.3,
                     yAxisID: SERIES[key].axis === 'soc' ? 'ySoc' : 'yPower',
                     hidden: !visible[key]
@@ -520,6 +523,7 @@
                 document.querySelectorAll('.graph-series').forEach(function (cb) {
                     cb.addEventListener('change', loadGraphData);
                 });
+                document.getElementById('graph-points').addEventListener('change', loadGraphData);
                 loadGraphDates();
             }
 
