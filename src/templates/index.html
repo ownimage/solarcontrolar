@@ -366,7 +366,7 @@
                     <label><input type="checkbox" class="graph-series" value="battery" checked> Battery</label>
                     <label><input type="checkbox" class="graph-series" value="battery_level" checked> Battery Level</label>
                 </span>
-                <label class="graph-points"><input type="checkbox" id="graph-points" checked> Data Points</label>
+                <label class="graph-points"><input type="checkbox" id="graph-points"> Data Points</label>
             </div>
             <div class="graph-wrap">
                 <canvas id="powerChart"></canvas>
@@ -376,6 +376,7 @@
     </div>
 
     <script src="/solar/static/chart.umd.min.js"></script>
+    <script src="/solar/static/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script>
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -444,13 +445,23 @@
                 const resp = await fetch(`/api/power_data?date=${encodeURIComponent(date)}`);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const data = await resp.json();
-                const hasData = data.times && data.times.length > 0;
+                const times = data.times || [];
+                const hasData = times.length > 0;
                 empty.style.display = hasData ? 'none' : 'block';
+
+                const timestamps = times.map(function (t) {
+                    return new Date(date + 'T' + t);
+                });
 
                 const seriesData = {};
                 Object.keys(SERIES).forEach(function (key) {
-                    seriesData[key] = (data[key] || []).map(function (v) {
-                        return v === null || v === undefined ? null : v;
+                    const values = data[key] || [];
+                    seriesData[key] = timestamps.map(function (ts, i) {
+                        const v = values[i];
+                        return {
+                            x: ts,
+                            y: (v === null || v === undefined) ? null : v
+                        };
                     });
                 });
 
@@ -459,14 +470,14 @@
                     visible[cb.value] = cb.checked;
                 });
 
-                renderGraph(data.times || [], seriesData, visible);
+                renderGraph(timestamps, seriesData, visible, date);
             } catch (e) {
                 empty.style.display = 'block';
                 empty.textContent = 'Error loading data';
             }
         }
 
-        function renderGraph(times, seriesData, visible) {
+        function renderGraph(timestamps, seriesData, visible, date) {
             const ctx = document.getElementById('powerChart').getContext('2d');
             const showPoints = document.getElementById('graph-points').checked;
             const datasets = [];
@@ -479,6 +490,7 @@
                     borderWidth: 2,
                     pointRadius: showPoints ? 2 : 0,
                     pointHoverRadius: showPoints ? 2 : 0,
+                    spanGaps: false,
                     tension: 0.3,
                     yAxisID: SERIES[key].axis === 'soc' ? 'ySoc' : 'yPower',
                     hidden: !visible[key]
@@ -490,18 +502,54 @@
             }
             powerChart = new Chart(ctx, {
                 type: 'line',
-                data: { labels: times, datasets: datasets },
+                data: { datasets: datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     scales: {
-                        x: { ticks: { maxTicksLimit: 24 } },
+                        x: {
+                            type: 'time',
+                            min: new Date(date + 'T00:00:00'),
+                            max: new Date(date + 'T23:59:59'),
+                            time: {
+                                unit: 'hour',
+                                stepSize: 1
+                            },
+                            ticks: {
+                                autoSkip: false,
+                                maxRotation: 0,
+                                callback: function (value) {
+                                    const d = new Date(value);
+                                    return d.getHours() % 3 === 0 ? String(d.getHours()).padStart(2, '0') : '';
+                                }
+                            },
+                            grid: {
+                                color: function (ctx) {
+                                    const d = new Date(ctx.tick.value);
+                                    return d.getHours() % 3 === 0 ? 'rgba(26,32,44,0.85)' : 'rgba(45,55,72,0.50)';
+                                },
+                                lineWidth: function (ctx) {
+                                    const d = new Date(ctx.tick.value);
+                                    return d.getHours() % 3 === 0 ? 2 : 1.5;
+                                }
+                            }
+                        },
                         yPower: {
                             type: 'linear',
                             position: 'left',
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1000,
+                                callback: function (value) {
+                                    return value + ' W';
+                                }
+                            },
                             title: { display: true, text: 'Power (W)' },
-                            grid: { color: 'rgba(0,0,0,0.05)' }
+                            grid: {
+                                color: 'rgba(45,55,72,0.45)',
+                                lineWidth: 1.5
+                            }
                         },
                         ySoc: {
                             type: 'linear',
