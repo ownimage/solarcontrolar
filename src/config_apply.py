@@ -9,7 +9,7 @@ import pytz
 
 from common.json_store import JsonStore
 from common.logging_setup import setup_logging
-from solarcontrolar.givenergymodbus import GivenergyModbus, PlantWrapper
+from solarcontrolar.givenergymodbus import GivenergyModbus, InverterSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ class ConfigApply:
 
     async def charge_to_percentage(self, tolerance, formatted_date):
         target_percentage = self.__config.read()["charge_to_percentage"]
-        data = await GivenergyModbus().read_data_direct()
-        battery_level = data.battery_percentage
+        data : InverterSnapshot = await GivenergyModbus().read_data_direct()
+        battery_level = data.battery_soc
         enabled = battery_level <= target_percentage
 
         if abs(battery_level - target_percentage) > tolerance:
