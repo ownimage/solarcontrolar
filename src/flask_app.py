@@ -2,7 +2,7 @@ import argparse
 import os
 import json
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf.csrf import CSRFProtect
 
 app = Flask(
@@ -225,6 +225,34 @@ def update_config():
     except Exception as e:
         flash(f"Error saving config: {str(e)}", "error")
     return redirect(url_for("index"))
+
+@app.route("/api/power_data")
+def api_power_data():
+    date_param = request.args.get("date", '', type=str)
+    try:
+        data = json.loads(open(POWER_FILE, "r").read())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({"dates": []}) if not date_param else (jsonify({"error": f"Power data file not found: {POWER_FILE}"}), 404)
+
+    dates = sorted(data.keys(), reverse=True)
+
+    if not date_param:
+        return jsonify({"dates": dates})
+
+    if date_param not in data:
+        return jsonify({"error": f"No data for date: {date_param}"}), 404
+
+    day = data[date_param]
+    times = list(day.keys())
+    return jsonify({
+        "date": date_param,
+        "times": times,
+        "solar": [day[t].get("solar") for t in times],
+        "grid": [day[t].get("grid") for t in times],
+        "home": [day[t].get("home") for t in times],
+        "battery": [day[t].get("battery") for t in times],
+        "battery_level": [day[t].get("battery_level") for t in times],
+    })
 
 @app.route("/api/files")
 def api_files():

@@ -76,6 +76,13 @@
         .log-select { width: 16rem; padding: 0.4rem 0.6rem; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 0.9rem; }
         .log-output { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; height: 60vh; overflow-y: auto; line-height: 1.5; }
         .loading { color: #718096; font-style: italic; }
+
+        /* Graph */
+        .graph-controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+        .graph-checkboxes { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+        .graph-checkboxes label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; cursor: pointer; }
+        .graph-checkboxes input[type="checkbox"] { accent-color: #3182ce; }
+        .graph-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1rem; position: relative; height: 60vh; }
     </style>
 </head>
 <body>
@@ -178,6 +185,7 @@
             <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
             <button class="tab-btn" onclick="switchTab('logs')">Files</button>
             <button class="tab-btn" onclick="switchTab('config')">Config</button>
+            <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
         </div>
 
         <div id="tab-power" class="tab-content active">
@@ -344,8 +352,29 @@
                 </div>
             </form>
         </div>
+
+        <div id="tab-graph" class="tab-content">
+            <div class="graph-controls">
+                <label for="graph-date">Day:</label>
+                <select id="graph-date" class="log-select">
+                    <option value="">Select a day</option>
+                </select>
+                <span class="graph-checkboxes">
+                    <label><input type="checkbox" class="graph-series" value="solar" checked> Solar</label>
+                    <label><input type="checkbox" class="graph-series" value="grid" checked> Grid</label>
+                    <label><input type="checkbox" class="graph-series" value="home" checked> Home</label>
+                    <label><input type="checkbox" class="graph-series" value="battery" checked> Battery</label>
+                    <label><input type="checkbox" class="graph-series" value="battery_level" checked> Battery Level</label>
+                </span>
+            </div>
+            <div class="graph-wrap">
+                <canvas id="powerChart"></canvas>
+                <p id="graph-empty" class="loading" style="display:none;">No power data available for this day.</p>
+            </div>
+        </div>
     </div>
 
+    <script src="/solar/static/chart.umd.min.js"></script>
     <script>
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -371,7 +400,129 @@
             output.classList.remove('loading');
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
+        const SERIES = {
+            solar:          { label: 'Solar',         color: '#ecc94b', axis: 'power' },
+            grid:           { label: 'Grid',          color: '#3182ce', axis: 'power' },
+            home:           { label: 'Home',          color: '#38a169', axis: 'power' },
+            battery:        { label: 'Battery',       color: '#805ad5', axis: 'power' },
+            battery_level:  { label: 'Battery Level', color: '#e53e3e', axis: 'soc' }
+        };
+
+        var powerChart = null;
+
+        async function loadGraphDates() {
+            const select = document.getElementById('graph-date');
+            try {
+                const resp = await fetch('/api/power_data');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                const dates = data.dates || [];
+                select.innerHTML = '';
+                if (!dates.length) {
+                    select.innerHTML = '<option value="">No data available</option>';
+                    return;
+                }
+                dates.forEach(function (d) {
+                    const opt = document.createElement('option');
+                    opt.value = d;
+                    opt.textContent = d;
+                    select.appendChild(opt);
+                });
+                select.value = dates[0];
+                loadGraphData();
+            } catch (e) {
+                select.innerHTML = '<option value="">Error loading dates</option>';
+            }
+        }
+
+        async function loadGraphData() {
+            const date = document.getElementById('graph-date').value;
+            const empty = document.getElementById('graph-empty');
+            if (!date) return;
+            try {
+                const resp = await fetch(`/api/power_data?date=${encodeURIComponent(date)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                const hasData = data.times && data.times.length > 0;
+                empty.style.display = hasData ? 'none' : 'block';
+
+                const seriesData = {};
+                Object.keys(SERIES).forEach(function (key) {
+                    seriesData[key] = (data[key] || []).map(function (v) {
+                        return v === null || v === undefined ? null : v;
+                    });
+                });
+
+                const visible = {};
+                document.querySelectorAll('.graph-series').forEach(function (cb) {
+                    visible[cb.value] = cb.checked;
+                });
+
+                renderGraph(data.times || [], seriesData, visible);
+            } catch (e) {
+                empty.style.display = 'block';
+                empty.textContent = 'Error loading data';
+            }
+        }
+
+        function renderGraph(times, seriesData, visible) {
+            const ctx = document.getElementById('powerChart').getContext('2d');
+            const datasets = [];
+            Object.keys(SERIES).forEach(function (key) {
+                datasets.push({
+                    label: SERIES[key].label,
+                    data: seriesData[key],
+                    borderColor: SERIES[key].color,
+                    backgroundColor: SERIES[key].color,
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    tension: 0.3,
+                    yAxisID: SERIES[key].axis === 'soc' ? 'ySoc' : 'yPower',
+                    hidden: !visible[key]
+                });
+            });
+
+            if (powerChart) {
+                powerChart.destroy();
+            }
+            powerChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: times, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 24 } },
+                        yPower: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Power (W)' },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        },
+                        ySoc: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'Battery Level (%)' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var graphDate = document.getElementById('graph-date');
+            if (graphDate) {
+                graphDate.addEventListener('change', loadGraphData);
+                document.querySelectorAll('.graph-series').forEach(function (cb) {
+                    cb.addEventListener('change', loadGraphData);
+                });
+                loadGraphDates();
+            }
+
             var rows = document.querySelectorAll('tr[data-key]');
             rows.forEach(function(row) {
                 var key = row.dataset.key;
