@@ -130,30 +130,23 @@
         </div>
         <script>
             (function() {
-                var rawDate = "{{ power_date }}";
-                var rawTime = "{{ power_time }}";
-
                 var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-                if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-                    var dp = rawDate.split('-');
-                    document.getElementById('yyyy').textContent = dp[0];
-                    document.getElementById('dd').textContent   = String(parseInt(dp[2])).padStart(2,'0');
-                    document.getElementById('mon').textContent  = months[parseInt(dp[1]) - 1] || '';
-                }
+                var now = new Date(Date.parse("{{ server_timestamp }}"));
 
-                if (/^\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
-                    var tp = rawTime.split(':');
-                    var hh = String(parseInt(tp[0])).padStart(2,'0');
-                    var mm = String(parseInt(tp[1])).padStart(2,'0');
-                    var ss = String(parseInt(tp[2])).padStart(2,'0');
-                    document.getElementById('h1').textContent = hh[0];
-                    document.getElementById('h2').textContent = hh[1];
-                    document.getElementById('m1').textContent = mm[0];
-                    document.getElementById('m2').textContent = mm[1];
-                    document.getElementById('s1').textContent = ss[0];
-                    document.getElementById('s2').textContent = ss[1];
-                }
+                document.getElementById('yyyy').textContent = now.getFullYear();
+                document.getElementById('dd').textContent   = String(now.getDate()).padStart(2,'0');
+                document.getElementById('mon').textContent  = months[now.getMonth()];
+
+                var hh = String(now.getHours()).padStart(2,'0');
+                var mm = String(now.getMinutes()).padStart(2,'0');
+                var ss = String(now.getSeconds()).padStart(2,'0');
+                document.getElementById('h1').textContent = hh[0];
+                document.getElementById('h2').textContent = hh[1];
+                document.getElementById('m1').textContent = mm[0];
+                document.getElementById('m2').textContent = mm[1];
+                document.getElementById('s1').textContent = ss[0];
+                document.getElementById('s2').textContent = ss[1];
 
                 var level = {{ power_data.battery_level if battery_valid else 'null' }};
                 var fill = document.getElementById('batteryFill');

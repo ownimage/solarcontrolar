@@ -2,6 +2,7 @@ import argparse
 import os
 import json
 import logging
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf.csrf import CSRFProtect
 
@@ -210,7 +211,8 @@ def index():
     settings = load_settings()
     config = load_config()
     power_date, power_time, power_data = get_latest_power()
-    return render_template("index.html", settings=settings, fields=SETTINGS, config=config, power_date=power_date, power_time=power_time, power_data=power_data)
+    server_timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    return render_template("index.html", settings=settings, fields=SETTINGS, config=config, power_date=power_date, power_time=power_time, power_data=power_data, server_timestamp=server_timestamp)
 
 @app.route("/api/config", methods=["POST"])
 def update_config():
