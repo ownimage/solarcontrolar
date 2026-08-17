@@ -178,6 +178,7 @@
             <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
             <button class="tab-btn" onclick="switchTab('logs')">Files</button>
             <button class="tab-btn" onclick="switchTab('config')">Config</button>
+            <button class="tab-btn" onclick="switchTab('forecast')">Forecast</button>
             <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
         </div>
 
@@ -344,6 +345,21 @@
                     <button type="submit">Save Changes</button>
                 </div>
             </form>
+        </div>
+
+        <div id="tab-forecast" class="tab-content">
+            <form method="POST" action="{{ url_for('run_forecast') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <p>Run the forecast pipeline: fetch the solar forecast, compare it with recent actuals to update the solar forecast multiplier, and recompute the battery charge target. This may take up to a few minutes.</p>
+                <div class="actions" style="text-align: left;">
+                    <button type="submit">Run Forecast Pipeline</button>
+                </div>
+            </form>
+            {% if forecast_status == 'ran' %}
+            <div class="log-output" style="margin-top: 1.5rem; height: 50vh;">{{ forecast_output }}</div>
+            {% else %}
+            <p class="loading" style="margin-top: 1.5rem;">Forecast pipeline output will appear here after running.</p>
+            {% endif %}
         </div>
 
         <div id="tab-graph" class="tab-content">

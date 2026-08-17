@@ -2,6 +2,8 @@ import argparse
 import os
 import json
 import logging
+import subprocess
+import sys
 from datetime import datetime
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
@@ -49,6 +51,7 @@ app.secret_key = _load_secret_key()
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 POWER_FILE = os.path.join(BASE_DIR, "minute_power.json")
+FORECAST_SCRIPT = os.path.join(BASE_DIR, "src", "forecast_pipeline.py")
 
 FILES = {
     "config_apply": os.path.join(BASE_DIR, "config_apply.log"),
@@ -191,6 +194,16 @@ def get_latest_power():
     except Exception:
         return None, None, None
 
+def _render_index(forecast_output=None, forecast_status="not_run"):
+    settings = load_settings()
+    config = load_config()
+    power_date, power_time, power_data = get_latest_power()
+    server_timestamp = datetime.now(pytz.timezone("Europe/London")).strftime("%Y-%m-%dT%H:%M:%S")
+    return render_template("index.html", settings=settings, fields=SETTINGS, config=config,
+                           power_date=power_date, power_time=power_time, power_data=power_data,
+                           server_timestamp=server_timestamp, forecast_output=forecast_output,
+                           forecast_status=forecast_status)
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -217,11 +230,31 @@ def index():
             flash(f"Error saving settings: {str(e)}", "error")
         return redirect(url_for("index"))
 
-    settings = load_settings()
-    config = load_config()
-    power_date, power_time, power_data = get_latest_power()
-    server_timestamp = datetime.now(pytz.timezone("Europe/London")).strftime("%Y-%m-%dT%H:%M:%S")
-    return render_template("index.html", settings=settings, fields=SETTINGS, config=config, power_date=power_date, power_time=power_time, power_data=power_data, server_timestamp=server_timestamp)
+    return _render_index()
+
+@app.route("/api/run_forecast", methods=["POST"])
+def run_forecast():
+    output = ""
+    try:
+        result = subprocess.run(
+            [sys.executable, FORECAST_SCRIPT],
+            capture_output=True,
+            text=True,
+            cwd=BASE_DIR,
+            timeout=180
+        )
+        output = result.stdout + result.stderr
+        if result.returncode == 0:
+            flash("Forecast pipeline completed.")
+        else:
+            flash(f"Forecast pipeline exited with code {result.returncode}.", "error")
+    except subprocess.TimeoutExpired as e:
+        output = f"Forecast pipeline timed out after 180 seconds.\n\n{e.stdout}{e.stderr}"
+        flash("Forecast pipeline timed out after 180 seconds.", "error")
+    except Exception as e:
+        output = str(e)
+        flash(f"Error running forecast pipeline: {e}", "error")
+    return _render_index(forecast_output=output, forecast_status="ran")
 
 @app.route("/api/config", methods=["POST"])
 def update_config():

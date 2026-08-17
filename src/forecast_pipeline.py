@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def run():
+    print("=" * 60)
     logger.info("forecast pipeline: start")
     logger.debug("stage 1/3: fetching solar forecast for tomorrow")
     SolarForecastGenerator().run()
