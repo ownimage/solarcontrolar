@@ -17,6 +17,7 @@ class SettingsKeys(Enum):
     MIN_CHARGE_TO_BIAS_KWH = "min_charge_to_bias_kwh"
     MAX_CHARGE_TO_BIAS_KWH = "max_charge_to_bias_kwh"
     USAGE_MULTIPLIER = "usage_multiplier"
+    FORECAST_ERROR_WINDOW = "forecast_error_window"
 
 
 class Settings(JsonStore):
@@ -56,3 +57,6 @@ class Settings(JsonStore):
 
     def usage_multiplier(self):
         return self._settings[SettingsKeys.USAGE_MULTIPLIER.value]
+
+    def forecast_error_window(self):
+        return self._settings[SettingsKeys.FORECAST_ERROR_WINDOW.value]

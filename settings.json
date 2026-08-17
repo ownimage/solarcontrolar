@@ -2,12 +2,13 @@
     "timezone": "Europe/London",
     "battery_capacity_kWh": 9.6,
     "battery_min_kWh": 0.4,
-    "solar_forecast_multiplier": 1.2191155946599816,
+    "solar_forecast_multiplier": 0.7546451101692023,
     "tolerance_percent": 0,
     "start_discharge_target": 30,
     "last_30mins_discharge_target": 16,
     "holiday_cutoff_kwh": 6,
-    "min_charge_to_bias_kwh": -0.5,
+    "min_charge_to_bias_kwh": -3,
     "max_charge_to_bias_kwh": -1.0,
-    "usage_multiplier": 1.45
+    "usage_multiplier": 1.45,
+    "forecast_error_window": 2
 }

@@ -144,6 +144,14 @@ SETTINGS = [
         "readonly": False,
         "description": "Safety factor applied to historical usage when estimating how much energy is needed",
         "slider": {"min": 0.5, "max": 2, "step": 0.05}
+    },
+    {
+        "key": "forecast_error_window",
+        "label": "Forecast Error Window (days)",
+        "type": "number",
+        "readonly": False,
+        "description": "Number of days that the solar forecast and history are compared to generate the solar_forecast_multiplier",
+        "slider": {"min": 1, "max": 14, "step": 1}
     }
 ]
 
