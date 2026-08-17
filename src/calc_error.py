@@ -13,13 +13,15 @@ class CalcError:
             self,
             forecast_store=JsonStore(Filenames.SOLAR_FORECAST_FILE.value),
             actuals_store=JsonStore(Filenames.SOLAR_ACTUALS.value),
-            settings_store=Settings()
+            settings_store=Settings(),
+            days = 2
     ):
+        self._days = days
         self.forecast_data = forecast_store.read()
         self.actuals_data = actuals_store.read()
         self.settings_store = settings_store
         today = datetime.now(settings_store.timezone())
-        self.start_date = (today - timedelta(days=4)).date()
+        self.start_date = (today - timedelta(days=self._days + 1)).date()
         self.end_date = (today - timedelta(days=1)).date()
         logger.debug("Comparing window: %s to %s (timezone %s)",
                      self.start_date, self.end_date, settings_store.timezone())
@@ -134,7 +136,8 @@ class CalcError:
             print(f"solar forecast multiplier: {multiplier}")
             logger.debug("Raw multiplier actual/forecast = %.4f", multiplier)
 
-            complete = actual_count == forecast_count == 192
+            expected_count = (self._days + 1) * 48
+            complete = actual_count == expected_count and forecast_count == expected_count
             in_range = 0.5 <= multiplier <= 1.5
             logger.debug("Data complete (192 periods each side): %s, multiplier in 0.5..1.5 range: %s",
                          complete, in_range)
@@ -144,8 +147,8 @@ class CalcError:
                 print(f"solar forecast multiplier: {multiplier} written to settings")
             else:
                 logger.warning("Multiplier NOT written: complete=%s, in_range=%s "
-                               "(forecast periods=%d, actual periods=%d)",
-                               complete, in_range, forecast_count, actual_count)
+                               "(forecast periods=%d, actual periods=%d, expected count=%d)",
+                               complete, in_range, forecast_count, actual_count, expected_count)
         else:
             print("⚠️ Forecast total is zero — cannot calculate multiplier.")
             logger.warning("Forecast total is zero, cannot calculate multiplier")
