@@ -7,6 +7,7 @@ setup_logging()
 from solar_forecast_generator import SolarForecastGenerator
 from calc_error import CalcError
 from config_generator import ConfigGenerator
+from settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def run():
     SolarForecastGenerator().run()
 
     logger.debug("stage 2/3: comparing recent forecasts with actuals")
-    CalcError().run()
+    CalcError(days=Settings().forecast_error_window()).run()
 
     logger.debug("stage 3/3: working out battery charge level for tomorrow")
     ConfigGenerator().run()

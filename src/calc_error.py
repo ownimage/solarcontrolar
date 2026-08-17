@@ -54,9 +54,6 @@ class CalcError:
             if self.start_date <= d <= self.end_date:
                 day_total = 0
                 day_periods = 0
-                # Compatible with both list and dict formats
-                print("entries: ", entries)
-                print("entries.values(): ", entries.values())
                 iterable = entries.values() if isinstance(entries, dict) else entries
                 for period in iterable:
                     if isinstance(period, dict):
