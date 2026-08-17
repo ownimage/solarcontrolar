@@ -173,16 +173,18 @@
         {% endif %}
         {% endwith %}
 
+        {% set active_tab = 'forecast' if forecast_status == 'ran' else 'power' %}
+
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('power')">Power</button>
+            <button class="tab-btn {{ 'active' if active_tab == 'power' else '' }}" onclick="switchTab('power')">Power</button>
             <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
             <button class="tab-btn" onclick="switchTab('logs')">Files</button>
             <button class="tab-btn" onclick="switchTab('config')">Config</button>
-            <button class="tab-btn" onclick="switchTab('forecast')">Forecast</button>
+            <button class="tab-btn {{ 'active' if active_tab == 'forecast' else '' }}" onclick="switchTab('forecast')">Forecast</button>
             <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
         </div>
 
-        <div id="tab-power" class="tab-content active">
+        <div id="tab-power" class="tab-content {{ 'active' if active_tab == 'power' else '' }}">
             {% if power_date and power_time and power_data %}
             <table>
                 <thead>
@@ -347,7 +349,7 @@
             </form>
         </div>
 
-        <div id="tab-forecast" class="tab-content">
+        <div id="tab-forecast" class="tab-content {{ 'active' if active_tab == 'forecast' else '' }}">
             <form method="POST" action="{{ url_for('run_forecast') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <p>Run the forecast pipeline: fetch the solar forecast, compare it with recent actuals to update the solar forecast multiplier, and recompute the battery charge target. This may take up to a few minutes.</p>
