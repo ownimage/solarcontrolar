@@ -1,4 +1,4 @@
 */1 * * * * /bin/bash -c "cd /app && . /app/envfile && . /app/venv/bin/activate && python /app/src/minute_poller.py" >> /app/minute_poller.log 2>&1
 */1 * * * * /bin/bash -c "cd /app && . /app/envfile && . /app/venv/bin/activate && python /app/src/config_apply.py" >> /app/config_apply.log 2>&1
-*/5 * * * * /bin/bash -c "cd /app && . /app/venv/bin/activate && python /app/src/flask_app.py &" 
+*/5 * * * * /bin/bash -c "cd /app && . /app/envfile && . /app/venv/bin/activate && python /app/src/flask_app.py &"
 30 20 * * * /bin/bash -c "cd /app && . /app/envfile && . /app/venv/bin/activate && python /app/src/forecast_pipeline.py" >> /app/forecast_pipeline.log 2>&1
