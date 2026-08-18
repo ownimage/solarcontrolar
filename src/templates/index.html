@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solar Controlar</title>
+    <link rel="icon" href="/solar/static/favicon.ico" type="image/x-icon">
+    <script>window.SOLAR_BASE = {{ request.script_root | tojson }};</script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; padding: 2rem; }
@@ -403,7 +405,7 @@
             output.textContent = 'Loading...';
             output.classList.add('loading');
             try {
-                const resp = await fetch(`/api/files?file=${encodeURIComponent(file)}&count=${encodeURIComponent(count)}`);
+                const resp = await fetch(`${SOLAR_BASE}/api/files?file=${encodeURIComponent(file)}&count=${encodeURIComponent(count)}`);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const text = await resp.text();
                 output.textContent = text;
@@ -426,7 +428,7 @@
         async function loadGraphDates() {
             const select = document.getElementById('graph-date');
             try {
-                const resp = await fetch('/api/power_data');
+                const resp = await fetch(`${SOLAR_BASE}/api/power_data`);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const data = await resp.json();
                 const dates = data.dates || [];
@@ -453,7 +455,7 @@
             const empty = document.getElementById('graph-empty');
             if (!date) return;
             try {
-                const resp = await fetch(`/api/power_data?date=${encodeURIComponent(date)}`);
+                const resp = await fetch(`${SOLAR_BASE}/api/power_data?date=${encodeURIComponent(date)}`);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const data = await resp.json();
                 const times = data.times || [];

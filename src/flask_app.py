@@ -2,6 +2,17 @@ import argparse
 import os
 import json
 import logging
+
+_ACCESS_LOG = os.path.join(os.path.dirname(os.path.dirname(__file__)), "flask_app.log")
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
+# The dev server's built-in per-request lines are replaced by the access log
+# emitted in log_access() below.
+logging.getLogger("werkzeug").setLevel(logging.DEBUG)
+
 import subprocess
 import sys
 from datetime import datetime
@@ -9,11 +20,8 @@ import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf.csrf import CSRFProtect
 
-app = Flask(
-    __name__,
-    static_url_path='/solar/static',
-    static_folder='static'
-)
+
+app = Flask(__name__, static_folder='static')
 
 # ⭐ Tell Flask it lives under /solar
 app.config['APPLICATION_ROOT'] = '/solar'
@@ -21,6 +29,54 @@ app.config['APPLICATION_ROOT'] = '/solar'
 # be sent on POST, leaving the CSRF session token "missing".
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.logger.setLevel(logging.DEBUG)
+
+_FILE_HANDLER = logging.FileHandler(_ACCESS_LOG)
+_FILE_HANDLER.setFormatter(
+    logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+)
+app.logger.addHandler(_FILE_HANDLER)
+app.logger.info("flask_app started, access logging enabled")
+
+
+
+@app.after_request
+def log_access(response):
+    log_time = datetime.now(pytz.timezone("Europe/London")).strftime("%d/%b/%Y:%H:%M:%S %z")
+    client_ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "-").split(",")[0].strip()
+    request_line = f"{request.method} {request.full_path.rstrip('?')} {request.environ.get('SERVER_PROTOCOL', 'HTTP/1.1')}"
+    content_length = response.content_length if response.content_length is not None else "-"
+    app.logger.info(f'{client_ip} - - [{log_time}] "{request_line}" {response.status_code} {content_length}')
+    return response
+
+class PrefixMiddleware:
+    """Make the app prefix-aware so it works behind the Traefik proxy.
+
+    Sets SCRIPT_NAME so url_for generates /solar/... links, and strips the
+    /solar prefix from incoming paths so Flask's routes still match. Uses the
+    X-Forwarded-Prefix header when the proxy sends one, otherwise /solar.
+    """
+
+    def __init__(self, wsgi_app, prefix="/solar"):
+        self.wsgi_app = wsgi_app
+        self.prefix = prefix.rstrip("/")
+
+    def __call__(self, environ, start_response):
+        script_name = self.prefix
+        forwarded = environ.get("HTTP_X_FORWARDED_PREFIX", "").strip().rstrip("/")
+        if forwarded:
+            script_name = forwarded
+        if script_name:
+            environ["SCRIPT_NAME"] = script_name
+            path_info = environ.get("PATH_INFO", "")
+            if path_info == script_name:
+                environ["PATH_INFO"] = "/"
+            elif path_info.startswith(script_name + "/"):
+                environ["PATH_INFO"] = path_info[len(script_name):]
+        return self.wsgi_app(environ, start_response)
+
+
+app.wsgi_app = PrefixMiddleware(app.wsgi_app, "/solar")
+
 
 csrf = CSRFProtect()
 csrf.init_app(app)
@@ -318,4 +374,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", type=int, default=5000, help="Port to run the Flask app on")
     args = parser.parse_args()
-    app.run(host="0.0.0.0", port=args.port, debug=True)
+    app.run(host="0.0.0.0", port=args.port, use_reloader=False)
