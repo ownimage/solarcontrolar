@@ -239,7 +239,6 @@
 
         <div id="tab-settings" class="tab-content">
             <form method="POST" action="{{ url_for('index') }}" id="settingsForm">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <table>
                     <thead>
                         <tr>
@@ -312,7 +311,6 @@
 
         <div id="tab-config" class="tab-content">
             <form method="POST" action="{{ url_for('update_config') }}" id="configForm">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <table>
                     <thead>
                         <tr>
@@ -353,7 +351,6 @@
 
         <div id="tab-forecast" class="tab-content {{ 'active' if active_tab == 'forecast' else '' }}">
             <form method="POST" action="{{ url_for('run_forecast') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <p>Run the forecast pipeline: fetch the solar forecast, compare it with recent actuals to update the solar forecast multiplier, and recompute the battery charge target. This may take up to a few minutes.</p>
                 <div class="actions" style="text-align: left;">
                     <button type="submit">Run Forecast Pipeline</button>

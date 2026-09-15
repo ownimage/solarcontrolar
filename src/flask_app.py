@@ -14,7 +14,6 @@ import sys
 from datetime import datetime
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from flask_wtf.csrf import CSRFProtect
 
 
 app = Flask(__name__, static_folder='static')
@@ -56,8 +55,16 @@ class PrefixMiddleware:
 app.wsgi_app = PrefixMiddleware(app.wsgi_app, "/solar")
 
 
-csrf = CSRFProtect()
-csrf.init_app(app)
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRFToken"
+    if request.method == "OPTIONS":
+        response.status_code = 204
+    return response
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -274,6 +281,8 @@ def run_forecast():
             [sys.executable, FORECAST_SCRIPT],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=BASE_DIR,
             timeout=180
         )
@@ -288,7 +297,9 @@ def run_forecast():
     except Exception as e:
         output = str(e)
         flash(f"Error running forecast pipeline: {e}", "error")
-    return _render_index(forecast_output=output, forecast_status="ran")
+    if "text/html" in request.headers.get("Accept", ""):
+        return _render_index(forecast_output=output, forecast_status="ran")
+    return output
 
 @app.route("/api/config", methods=["POST"])
 def update_config():
