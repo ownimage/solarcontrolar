@@ -60,7 +60,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRFToken"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRFToken"
     if request.method == "OPTIONS":
         response.status_code = 204
     return response
