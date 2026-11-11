@@ -1,11 +1,11 @@
 import asyncio
-import json
 import logging
+import math
 from datetime import datetime, timedelta
 
 from common.json_store import JsonStore
 from filenames import Filenames
-from solarcontrolar.givenergymodbus import GivenergyModbus, PlantWrapper, InverterSnapshot
+from solarcontrolar.givenergymodbus import GivenergyModbus, InverterSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,9 @@ class MinutePoller:
 
         data[date_str][time_str] = {
             "solar": solar,
-            "usage": usage
+            "usage": usage,
+            "usage_method": "givtcp_dc_hybrid_v2",
+            "solar_method": "pv_ir11_12_v1"
         }
         minute_store.write(data)
         entry_count = len(data)
@@ -59,7 +61,8 @@ class MinutePoller:
 
         data = await GivenergyModbus().read_data_direct()
         self._save_meter_data_latest(data)
-        self._save_power_data(data)
+        if data.date_str and data.time_str:
+            self._save_power_data(data)
 
     def _save_power_data(self, data: InverterSnapshot):
         logger.info("system-data-latest: %s", data.system_time)
@@ -76,27 +79,6 @@ class MinutePoller:
 
         self._store_power_data(date_str, time_str, status, solar, grid, home, battery, battery_level)
 
-    def _load_anchor(self, now):
-        anchor = self.__state.read()
-        if not anchor:
-            logger.debug("No anchor state, treating as first run")
-            return None
-
-        try:
-            anchor_boundary = datetime.fromisoformat(anchor["boundary"])
-            anchor_solar = anchor["solar"]
-            anchor_usage = anchor["usage"]
-        except (KeyError, TypeError, ValueError):
-            logger.warning("Corrupt poller anchor state %r, re-anchoring", anchor)
-            return None
-
-        if not (now - timedelta(days=1)) <= anchor_boundary <= now + timedelta(minutes=5):
-            logger.warning("Stale poller anchor boundary %s (now=%s), re-anchoring",
-                           anchor_boundary.isoformat(), now.isoformat())
-            return None
-
-        return {"boundary": anchor_boundary, "solar": anchor_solar, "usage": anchor_usage}
-
     def get_meter_data_latest(self, data: InverterSnapshot):
         date_str = data.date_str
         time_str = data.time_str
@@ -106,67 +88,68 @@ class MinutePoller:
         return date_str, time_str, solar_total, usage_total
 
     def _save_meter_data_latest(self, data: InverterSnapshot):
+        """Store cumulative kWh and summarise complete, observed half-hours.
+
+        Interpolate counters at boundaries between adjacent polls (max 180s).
+        Versioned state prevents deltas across energy formula/register changes.
+        """
         date_str, time_str, solar, usage = self.get_meter_data_latest(data)
-        logger.info("meter-data-latest: %s", json.dumps(
-            {"date": date_str, "time": time_str, "solar": solar, "usage": usage},
-            separators=(",", ":")))
-
-        self._store_minute_value(date_str, time_str, solar, usage)
-
         try:
             now = datetime.fromisoformat(f"{date_str}T{time_str}")
-        except ValueError:
-            logger.warning("Unparseable meter timestamp %r/%r, skipping half-hour summary",
-                           date_str, time_str)
+            if not all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0
+                       for v in (solar, usage)):
+                raise ValueError("invalid energy counters")
+        except (ValueError, TypeError):
+            logger.warning("Invalid meter sample; dropping anchor")
+            self.__state.write({})
             return
 
-        current_boundary = now.replace(
-            minute=(now.minute // 30) * 30,
-            second=0,
-            microsecond=0
-        )
-
-        anchor = self._load_anchor(now)
-        if not anchor:
-            self._save_anchor(current_boundary, solar, usage)
-            return
-
-        anchor_boundary = anchor["boundary"]
-
-        if now >= anchor_boundary + timedelta(minutes=60):
-            logger.warning("Gap since last poll %s (>60 min), skipping missed window and "
-                           "re-anchoring at %s",
-                           anchor_boundary.isoformat(), current_boundary.isoformat())
-            self._save_anchor(current_boundary, solar, usage)
-            return
-
-        if current_boundary > anchor_boundary:
-            # value is calculated and written when the first reading from the next period happens
-            solar_delta = round(solar - anchor["solar"], 1)
-            usage_delta = round(usage - anchor["usage"], 1)
-
-            half_hour_key = anchor_boundary.strftime("%H:%M")
-            date_key = anchor_boundary.date().isoformat()
-
-            self._write_halfhour_summaries(
-                date_key=date_key,
-                half_hour_key=half_hour_key,
-                solar_value=solar_delta,
-                usage_value=usage_delta
-            )
-
-        if current_boundary != anchor_boundary:
-            # always save first value in a new half hour boundary
-            self._save_anchor(current_boundary, solar, usage)
-
-    def _save_anchor(self, boundary, solar, usage):
-        anchor = {
-            "boundary": boundary.isoformat(),
-            "solar": solar,
-            "usage": usage
-        }
-        self.__state.write(anchor)
-        print(f"{Filenames.MINUTE_POLLER_STATE_FILE.value}: anchor={anchor}")
+        state = self.__state.read()
+        sample = {"timestamp": now.isoformat(), "solar": solar, "usage": usage}
+        next_state = {"version": 3, "last_sample": sample}
+        if state.get("version") == 3:
+            try:
+                previous = state["last_sample"]
+                then = datetime.fromisoformat(previous["timestamp"])
+                seconds = (now - then).total_seconds()
+                # Duplicate/out-of-order polls must not replace a newer baseline.
+                if seconds <= 0:
+                    logger.warning("Ignoring duplicate or backwards meter timestamp")
+                    return
+                valid = (seconds <= 180 and all(
+                    isinstance(previous[k], (int, float)) and math.isfinite(previous[k])
+                    and sample[k] >= previous[k] - 0.3 for k in ("solar", "usage")))
+            except (KeyError, TypeError, ValueError):
+                valid = False
+            if valid:
+                boundary = now.replace(minute=now.minute // 30 * 30, second=0, microsecond=0)
+                if then < boundary <= now:
+                    fraction = (boundary - then).total_seconds() / seconds
+                    counters = {k: previous[k] + fraction * (sample[k] - previous[k])
+                                for k in ("solar", "usage")}
+                    anchor = state.get("anchor", {})
+                    if anchor.get("boundary") == (boundary - timedelta(minutes=30)).isoformat():
+                        try:
+                            deltas = {k: round(counters[k] - anchor[k], 3) for k in counters}
+                            if all(math.isfinite(v) and v >= 0 for v in deltas.values()):
+                                start = boundary - timedelta(minutes=30)
+                                self._write_halfhour_summaries(
+                                    start.date().isoformat(), start.strftime("%H:%M"),
+                                    deltas["solar"], deltas["usage"])
+                            else:
+                                logger.warning("Negative half-hour delta; skipping suspect period")
+                        except (KeyError, TypeError, ValueError):
+                            logger.warning("Invalid half-hour anchor; re-anchoring")
+                    next_state["anchor"] = {"boundary": boundary.isoformat(), **counters}
+                elif "anchor" in state:
+                    next_state["anchor"] = state["anchor"]
+            else:
+                logger.warning("Poll gap, counter reset or corrupt state; dropping partial period")
+        # An exact boundary can start a complete period immediately.
+        if now.minute % 30 == 0 and now.second == 0 and now.microsecond == 0:
+            next_state["anchor"] = {"boundary": now.isoformat(), "solar": solar, "usage": usage}
+        self._store_minute_value(date_str, time_str, solar, usage)
+        self.__state.write(next_state)
 
     def _write_halfhour_summaries(self, date_key, half_hour_key, solar_value, usage_value):
         self._write_solar_actuals(date_key, half_hour_key, solar_value)
@@ -195,5 +178,4 @@ if __name__ == "__main__":
     from common.logging_setup import setup_logging
 
     setup_logging()
-    poller = MinutePoller()
     asyncio.run(MinutePoller().run())
