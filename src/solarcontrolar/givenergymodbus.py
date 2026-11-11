@@ -65,6 +65,10 @@ class InverterSnapshot:
     enable_discharge: bool | None
     enable_charge: bool | None
     status: str | None
+    # Lifetime energy counters in kWh; None means unavailable, not zero.
+    grid_import_total: float | None = None
+    grid_export_total: float | None = None
+    ac_charge_total: float | None = None
 
 
 def _system_battery_voltage(dtc_raw: int) -> float:
@@ -83,6 +87,8 @@ def _decode_snapshot(ir: list, hr: list, hr_enable_charge: int) -> InverterSnaps
     Mirrors the single-phase register layout and its derived properties
     (e.g. battery_capacity_kwh, grid/battery powers, consumption total).
     """
+    if hr[0] is None or f"{hr[0]:04x}"[0] != "2":
+        raise ValueError("Direct polling supports single-phase DC-hybrid (2xxx) inverters only")
     system_time = None
     if None not in (hr[35], hr[36], hr[37], hr[38], hr[39], hr[40]):
         try:
@@ -102,7 +108,10 @@ def _decode_snapshot(ir: list, hr: list, hr_enable_charge: int) -> InverterSnaps
     battery_charge_power = max(0, -p_battery) if p_battery is not None else None
     battery_discharge_power = max(0, p_battery) if p_battery is not None else None
 
-    generation_total = _uint32(ir[45], ir[46]) / 10 if None not in (ir[45], ir[46]) else None
+    # Keep PV input energy separate from the inverter-energy counter used by
+    # the load balance. IR45/46 can increase during battery discharge.
+    generation_total = _uint32(ir[11], ir[12]) / 10 if None not in (ir[11], ir[12]) else None
+    inverter_energy_total = _uint32(ir[45], ir[46]) / 10 if None not in (ir[45], ir[46]) else None
 
     battery_capacity_ah = hr[55]
     battery_capacity_kwh = (
@@ -114,21 +123,25 @@ def _decode_snapshot(ir: list, hr: list, hr_enable_charge: int) -> InverterSnaps
     e_grid_in_total = _uint32(ir[32], ir[33]) / 10 if None not in (ir[32], ir[33]) else None
     e_grid_out_total = _uint32(ir[21], ir[22]) / 10 if None not in (ir[21], ir[22]) else None
     battery_soc = ir[59]
-    if None not in (generation_total, e_grid_in_total, e_grid_out_total):
-        # Energy balance treating the battery as internal storage: the battery term
-        # dropped here swung with SoC, making the total go backwards on every charge.
-        consumption_total = round(generation_total + e_grid_in_total - e_grid_out_total, 1)
+    e_ac_charge_total = _uint32(ir[27], ir[28]) / 10 if None not in (ir[27], ir[28]) else None
+    if None not in (inverter_energy_total, e_grid_in_total, e_grid_out_total, e_ac_charge_total):
+        # GivTCP's single-phase DC-hybrid load estimate (kWh). Exclude AC
+        # charging; inverter output + net grid alone includes AC charging.
+        # This is a derived estimate, not a revenue-grade house energy meter.
+        consumption_total = round(
+            inverter_energy_total + e_grid_in_total - e_grid_out_total - e_ac_charge_total, 1
+        )
     else:
         consumption_total = None
 
     return InverterSnapshot(
         battery_soc=battery_soc,
         system_time=system_time,
-        date_str=system_time.date().isoformat(),
-        time_str=system_time.time().isoformat(),
+        date_str=system_time.date().isoformat() if system_time else None,
+        time_str=system_time.time().isoformat() if system_time else None,
         solar_power=solar_power,
-        grid_power=grid_import_power - grid_export_power,
-        battery_power=battery_discharge_power - battery_charge_power,
+        grid_power=-p_grid_out if p_grid_out is not None else None,
+        battery_power=p_battery,
         grid_import_power=grid_import_power,
         grid_export_power=grid_export_power,
         battery_charge_power=battery_charge_power,
@@ -137,6 +150,9 @@ def _decode_snapshot(ir: list, hr: list, hr_enable_charge: int) -> InverterSnaps
         generation_total=generation_total,
         battery_capacity_kwh=battery_capacity_kwh,
         consumption_total=consumption_total,
+        grid_import_total=e_grid_in_total,
+        grid_export_total=e_grid_out_total,
+        ac_charge_total=e_ac_charge_total,
         enable_discharge=bool(hr[59]) if hr[59] is not None else None,
         enable_charge=bool(hr_enable_charge),
         status=_STATUS_NAMES.get(ir[0], "UNKNOWN"),
@@ -184,14 +200,16 @@ class PlantWrapper:
         self._solar_power = inv.p_pv()
         self._grid_power = inv.grid_import_power - inv.grid_export_power
         self._battery_power = inv.battery_discharge_power - inv.battery_charge_power
-        self._house_power = - inv.p_load_demand
-        self._generation_total = inv.e_pv_generation_total
-        # Energy balance treating the battery as internal storage (the battery SoC term
-        # previously subtracted here made the total go backwards on every charge cycle).
-        self._consumption_total = round(
-            inv.e_pv_generation_total
-            + inv.e_grid_in_total - inv.e_grid_out_total,
-            1
+        self._house_power = inv.p_load_demand
+        self._grid_import_total = inv.e_grid_in_total
+        self._grid_export_total = inv.e_grid_out_total
+        self._ac_charge_total = inv.e_inverter_in_total
+        self._generation_total = inv.e_pv_total
+        values = (inv.e_pv_generation_total, inv.e_grid_in_total,
+                  inv.e_grid_out_total, inv.e_inverter_in_total)
+        self._consumption_total = (
+            round(values[0] + values[1] - values[2] - values[3], 1)
+            if None not in values else None
         )
         self._enable_discharge = inv.enable_discharge
         self._enable_charge = inv.enable_charge
@@ -235,6 +253,18 @@ class PlantWrapper:
     @property
     def generation_total(self):
         return self._generation_total
+
+    @property
+    def grid_import_total(self):
+        return self._grid_import_total
+
+    @property
+    def grid_export_total(self):
+        return self._grid_export_total
+
+    @property
+    def ac_charge_total(self):
+        return self._ac_charge_total
 
     @property
     def consumption_total(self):
