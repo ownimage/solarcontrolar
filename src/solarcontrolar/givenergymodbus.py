@@ -394,22 +394,29 @@ class GivenergyModbus():
         return response.register_values[0]
 
 
-    async def _set_battery_flag(self, register: int, enabled : bool):
+    async def _set_battery_flag(self, register: int, enabled: bool):
+        """Return True only after a changed flag is confirmed by a fresh read.
+
+        A failed readback raises so the public setters' retry policy can retry
+        the operation rather than reporting an unconfirmed write as a change.
+        """
         value = 1 if enabled else 0
         lock = acquire_lock()
         try:
             client = Client(host=self.inverter_ip, port=self.inverter_port)
-            await client.connect()
             try:
+                await client.connect()
                 before = await self._read_holding_register(client, register)
                 if before == value:
-                    # print('no change')
                     return False
                 write_request = WriteHoldingRegisterRequest(register, value)
                 await client.one_shot_command([write_request])
-                before = await self._read_holding_register(client, register)
-                # print('changed')
-                return before != value
+                actual = await self._read_holding_register(client, register)
+                if actual != value:
+                    raise RuntimeError(
+                        f"battery HR({register}) write not confirmed: wanted={value} actual={actual}"
+                    )
+                return True
             finally:
                 await client.close()
         finally:
