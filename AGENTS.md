@@ -23,6 +23,12 @@ from src so sibling imports work. Dependencies are pinned in requirements.txt.
   Solcast forecasts are retained in solar_forecast_history.json; recent actuals
   calibrate the forecast multiplier in settings.json. Historical usage and
   forecasts determine charge_to_percentage in config.json.
+- Battery flag setters use direct holding-register reads/writes: HR96 charge,
+  HR59 discharge. They return False when already correct, True only after a
+  changed value is confirmed by a fresh read, and raise on readback mismatch
+  so the public setter retry policy can retry. Client and device lock are
+  cleaned up on failures. tests/test_battery_flags.py uses mocked transport;
+  never exercise these writes on live hardware as a test.
 - src/config_apply.py: every minute, applies config/settings to charge/discharge
   flags. This writes to real hardware; never run it as a development test.
 - src/flask_app.py with templates/ and static/: settings/control and monitoring
