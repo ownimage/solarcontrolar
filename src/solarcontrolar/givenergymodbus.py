@@ -65,6 +65,10 @@ class InverterSnapshot:
     enable_discharge: bool | None
     enable_charge: bool | None
     status: str | None
+    # Lifetime energy counters in kWh; None means unavailable, not zero.
+    grid_import_total: float | None = None
+    grid_export_total: float | None = None
+    ac_charge_total: float | None = None
 
 
 def _system_battery_voltage(dtc_raw: int) -> float:
@@ -146,6 +150,9 @@ def _decode_snapshot(ir: list, hr: list, hr_enable_charge: int) -> InverterSnaps
         generation_total=generation_total,
         battery_capacity_kwh=battery_capacity_kwh,
         consumption_total=consumption_total,
+        grid_import_total=e_grid_in_total,
+        grid_export_total=e_grid_out_total,
+        ac_charge_total=e_ac_charge_total,
         enable_discharge=bool(hr[59]) if hr[59] is not None else None,
         enable_charge=bool(hr_enable_charge),
         status=_STATUS_NAMES.get(ir[0], "UNKNOWN"),
@@ -194,6 +201,9 @@ class PlantWrapper:
         self._grid_power = inv.grid_import_power - inv.grid_export_power
         self._battery_power = inv.battery_discharge_power - inv.battery_charge_power
         self._house_power = inv.p_load_demand
+        self._grid_import_total = inv.e_grid_in_total
+        self._grid_export_total = inv.e_grid_out_total
+        self._ac_charge_total = inv.e_inverter_in_total
         self._generation_total = inv.e_pv_total
         values = (inv.e_pv_generation_total, inv.e_grid_in_total,
                   inv.e_grid_out_total, inv.e_inverter_in_total)
@@ -243,6 +253,18 @@ class PlantWrapper:
     @property
     def generation_total(self):
         return self._generation_total
+
+    @property
+    def grid_import_total(self):
+        return self._grid_import_total
+
+    @property
+    def grid_export_total(self):
+        return self._grid_export_total
+
+    @property
+    def ac_charge_total(self):
+        return self._ac_charge_total
 
     @property
     def consumption_total(self):

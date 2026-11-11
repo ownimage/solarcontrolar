@@ -41,6 +41,12 @@ from src so sibling imports work. Dependencies are pinned in requirements.txt.
   counter increasing during battery discharge at zero PV power. Keep IR45/46
   separate for the existing usage balance below, regardless of the library's
   confusing e_pv_generation_total name.
+- New minute_totals entries additionally record grid_import_total (IR32/33),
+  grid_export_total (IR21/22), and ac_charge_total (IR27/28): unsigned 32-bit
+  high word first, divided by 10, lifetime kWh. They are exposed on both
+  InverterSnapshot and PlantWrapper. A missing counter is None/null, not zero.
+  Old entries are preserved without invented backfill. No poller state version
+  change is needed because solar/usage calculations have not changed.
 - Usage estimate follows GivTCP's single-phase DC-hybrid load calculation:
   IR45/46 + grid import IR32/33 - grid export IR21/22 - AC charge IR27/28,
   each pair scaled by 0.1 kWh. Do not insert nominal battery capacity times SoC.
@@ -77,7 +83,8 @@ __main__ section during tests. The latter contacts hardware even for reads.
 - Runtime JSON and log files can contain uncommitted user changes. Preserve them;
   do not reset, regenerate or bulk-format them as part of source changes.
 - Old energy history cannot be reconstructed exactly from minute_totals.json:
-  individual grid/AC charge counters and true PV IR11/12 were not retained.
+  individual grid/AC charge counters and true PV IR11/12 were not retained
+  in the older history (new samples now retain the grid/AC counters).
   The old solar series cannot be converted exactly to the true PV series. Negative historical
   home-power readings also prevent a trustworthy automatic power-based rebuild.
 - JsonStore currently performs whole-file, non-atomic writes without locking;

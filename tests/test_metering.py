@@ -57,6 +57,23 @@ class DecodeTests(unittest.TestCase):
         self.assertIsNone(snapshot.generation_total)
         self.assertEqual(snapshot.consumption_total, 1200)
 
+    def test_additional_energy_counters_scale_high_words_and_preserve_zero(self):
+        ir, hr = registers()
+        ir[32:34] = [1, 2345]
+        ir[21:23] = [2, 3456]
+        ir[27:29] = [0, 0]
+        snapshot = _decode_snapshot(ir, hr, 0)
+        self.assertEqual(snapshot.grid_import_total, 6788.1)
+        self.assertEqual(snapshot.grid_export_total, 13452.8)
+        self.assertEqual(snapshot.ac_charge_total, 0.0)
+
+    def test_missing_additional_energy_counter_is_unavailable(self):
+        for high in (32, 21, 27):
+            ir, hr = registers(); ir[high] = None
+            snapshot = _decode_snapshot(ir, hr, 0)
+            attribute = {32: 'grid_import_total', 21: 'grid_export_total', 27: 'ac_charge_total'}[high]
+            self.assertIsNone(getattr(snapshot, attribute))
+
     def test_soc_is_not_energy_meter(self):
         ir, hr = registers()
         a = _decode_snapshot(ir, hr, 0)
@@ -95,6 +112,8 @@ class DecodeTests(unittest.TestCase):
         self.assertEqual(w.consumption_total,1200)
         self.assertEqual(w.house_power,350)
         self.assertEqual(w.generation_total,1600)
+        self.assertEqual((w.grid_import_total, w.grid_export_total, w.ac_charge_total),
+                         (500, 200, 100))
 
 class PollerTests(unittest.TestCase):
     def setUp(self):
@@ -111,9 +130,22 @@ class PollerTests(unittest.TestCase):
     def feed(self, timestamp, solar=100, usage=200):
         t=datetime.fromisoformat(timestamp)
         self.poller._save_meter_data_latest(SimpleNamespace(date_str=t.date().isoformat(),
-            time_str=t.time().isoformat(),generation_total=solar,consumption_total=usage))
+            time_str=t.time().isoformat(),generation_total=solar,consumption_total=usage,
+            grid_import_total=500.1,grid_export_total=200.2,ac_charge_total=100.3))
 
     def actuals(self): return JsonStore(str(self.root/'usage_actuals.json')).read()
+
+    def test_minute_entry_records_lifetime_counters_and_preserves_history(self):
+        store = JsonStore(str(self.root/'minute_totals.json'))
+        old = {'solar': 1, 'usage': 2}
+        store.write({'2026-08-14': {'12:00:00': old}})
+        self.feed('2026-08-15T12:00:00')
+        saved = store.read()
+        entry = saved['2026-08-15']['12:00:00']
+        self.assertEqual((entry['grid_import_total'], entry['grid_export_total'],
+                          entry['ac_charge_total']), (500.1, 200.2, 100.3))
+        self.assertEqual(saved['2026-08-14']['12:00:00'], old)
+        self.assertEqual((entry['solar'], entry['usage']), (100, 200))
 
     def test_complete_period_and_restart(self):
         start=datetime(2026,8,15,12)

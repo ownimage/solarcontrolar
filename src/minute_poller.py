@@ -14,7 +14,8 @@ class MinutePoller:
     def __init__(self):
         self.__state = JsonStore(Filenames.MINUTE_POLLER_STATE_FILE.value)
 
-    def _store_minute_value(self, date_str, time_str, solar, usage):
+    def _store_minute_value(self, date_str, time_str, solar, usage, *,
+                            grid_import_total=None, grid_export_total=None, ac_charge_total=None):
         minute_store = JsonStore(Filenames.MINUTE_TOTALS_FILE.value)
         data = minute_store.read()
 
@@ -24,6 +25,9 @@ class MinutePoller:
         data[date_str][time_str] = {
             "solar": solar,
             "usage": usage,
+            "grid_import_total": grid_import_total,
+            "grid_export_total": grid_export_total,
+            "ac_charge_total": ac_charge_total,
             "usage_method": "givtcp_dc_hybrid_v2",
             "solar_method": "pv_ir11_12_v1"
         }
@@ -148,7 +152,12 @@ class MinutePoller:
         # An exact boundary can start a complete period immediately.
         if now.minute % 30 == 0 and now.second == 0 and now.microsecond == 0:
             next_state["anchor"] = {"boundary": now.isoformat(), "solar": solar, "usage": usage}
-        self._store_minute_value(date_str, time_str, solar, usage)
+        self._store_minute_value(
+            date_str, time_str, solar, usage,
+            grid_import_total=data.grid_import_total,
+            grid_export_total=data.grid_export_total,
+            ac_charge_total=data.ac_charge_total,
+        )
         self.__state.write(next_state)
 
     def _write_halfhour_summaries(self, date_key, half_hour_key, solar_value, usage_value):
