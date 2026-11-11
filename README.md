@@ -1,3 +1,8 @@
+# IMPORTANT
+
+THIS REPO IS NOT LONGER MAINTAINED.
+It has been moved to https://github.com/ownimage/MyApps/tree/main/SolarControlar/server
+
 # Introduction
 
 I have solar panels and a GivEnergyInverter and battery.  
